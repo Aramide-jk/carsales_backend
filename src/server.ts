@@ -44,15 +44,15 @@ app.use(helmet());
 if (NODE_ENV === "development") app.use(morgan("dev"));
 
 // CORS
-const allowedOrigins = [
-  process.env.FRONTEND_URL_LOCAL,
-  process.env.FRONTEND_URL_VITE,
-  process.env.FRONTEND_URL,
-].filter((origin): origin is string => !!origin);
-
+// const allowedOrigins = [
+//   process.env.FRONTEND_URL_LOCAL,
+//   process.env.FRONTEND_URL_VITE,
+//   process.env.FRONTEND_URL,
+// ].filter((origin): origin is string => !!origin);
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
