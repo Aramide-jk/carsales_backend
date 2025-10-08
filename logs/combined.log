@@ -1016,3 +1016,4 @@
 {"level":"info","message":"MongoDB connected: 127.0.0.1","service":"jk-autos-backend","timestamp":"2025-10-08 21:31:58"}
 {"level":"info","message":"MongoDB connected: 127.0.0.1","service":"jk-autos-backend","timestamp":"2025-10-08 21:35:08"}
 {"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-02.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-08 21:37:56"}
+{"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-01.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-08 21:54:16"}

@@ -21,10 +21,11 @@ import soldRoutes from "./routes/soldCarsRoute";
 // Environment setup
 // --------------------
 const NODE_ENV = process.env.NODE_ENV || "development";
+const PORT = process.env.PORT || process.env.DEV_PORT || 5000;
 
-const PORT =
-  process.env.PORT ||
-  (NODE_ENV === "production" ? process.env.PROD_PORT : process.env.DEV_PORT);
+// const PORT =
+//   process.env.PORT ||
+//   (NODE_ENV === "production" ? process.env.PROD_PORT : process.env.DEV_PORT);
 
 const DB_URL =
   NODE_ENV === "production"
