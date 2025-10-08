@@ -21,11 +21,14 @@ import soldRoutes from "./routes/soldCarsRoute";
 // Environment setup
 // --------------------
 const NODE_ENV = process.env.NODE_ENV || "development";
-const PORT = process.env.PORT || process.env.DEV_PORT || 5000;
 
-// const PORT =
-//   process.env.PORT ||
-//   (NODE_ENV === "production" ? process.env.PROD_PORT : process.env.DEV_PORT);
+// process.env.PORT || process.env.PROD_PORT || process.env.DEV_PORT || 5000;
+
+const PORT =
+  process.env.PORT ||
+  (NODE_ENV === "production"
+    ? process.env.PROD_PORT && process.env.FRONTEND_URL_PRO
+    : process.env.DEV_PORT);
 
 const DB_URL =
   NODE_ENV === "production"
@@ -60,6 +63,7 @@ if (NODE_ENV === "development") app.use(morgan("dev"));
 // --------------------
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_PRO,
   process.env.FRONTEND_URL_LOCAL,
   process.env.FRONTEND_URL_VITE,
 ].filter((origin): origin is string => !!origin);
@@ -74,8 +78,8 @@ app.use(
 // --------------------
 // Health check route (important for Railway)
 // --------------------
-app.get("/", (_req, res) => {
-  res.send("🚀 Carsales backend is live and running!");
+app.get("/", (req, res) => {
+  res.send("✅ CarSales Backend is running successfully!");
 });
 
 // --------------------
