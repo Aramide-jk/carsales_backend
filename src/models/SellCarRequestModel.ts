@@ -1,7 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
 export interface ISellCarRequest {
-  user: mongoose.Types.ObjectId; // logged-in user ref
+  user: mongoose.Types.ObjectId; 
   brand: string;
   model: string;
   year: number;
