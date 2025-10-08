@@ -13,6 +13,7 @@ import sellRoutes from "./routes/sellCarRequestRoutes";
 import sendEmailRoutes from "./routes/sendEmailRoute";
 import carRoute from "./routes/carRoute";
 import soldRoutes from "./routes/soldCarsRoute";
+// import { errorHandler } from "./middleware/errorMiddleware";
 
 const NODE_ENV = process.env.NODE_ENV || "development";
 const PORT =
