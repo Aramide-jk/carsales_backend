@@ -58,9 +58,9 @@ if (NODE_ENV === "development") app.use(morgan("dev"));
 // CORS setup
 // --------------------
 const allowedOrigins = [
+  process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_LOCAL,
   process.env.FRONTEND_URL_VITE,
-  process.env.FRONTEND_URL,
 ].filter((origin): origin is string => !!origin);
 
 app.use(
