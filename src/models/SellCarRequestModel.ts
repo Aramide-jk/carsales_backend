@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema} from "mongoose";
 
 export interface ISellCarRequest {
   user: mongoose.Types.ObjectId; // logged-in user ref

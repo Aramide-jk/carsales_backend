@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-import User, { IUser } from "../models/UserModel"; // Assuming you have an IUser interface in your User model
+import User, { IUser } from "../models/UserModel"; 
 
 interface JwtPayload {
   id: string;

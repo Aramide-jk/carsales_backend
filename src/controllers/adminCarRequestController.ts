@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import SellCar, { ISellCarRequest } from "../models/SellCarRequestModel";
+import SellCar from "../models/SellCarRequestModel";
 import { AuthRequest } from "../types/type.auth";
 import { sendEmail } from "../utils/sendEmail";
 import { IUser } from "../models/UserModel";

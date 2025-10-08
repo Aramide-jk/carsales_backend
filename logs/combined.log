@@ -996,3 +996,5 @@
 {"level":"info","message":"Car created: Honda Accord","service":"jk-autos-backend","timestamp":"2025-10-07 23:18:38"}
 {"level":"info","message":"Car created: Honda Accord","service":"jk-autos-backend","timestamp":"2025-10-07 23:23:48"}
 {"level":"info","message":"MongoDB connected: 127.0.0.1","service":"jk-autos-backend","timestamp":"2025-10-08 06:48:10"}
+{"level":"info","message":"MongoDB connected: 127.0.0.1","service":"jk-autos-backend","timestamp":"2025-10-08 11:05:03"}
+{"level":"info","message":"MongoDB connected: 127.0.0.1","service":"jk-autos-backend","timestamp":"2025-10-08 13:56:23"}

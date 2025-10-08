@@ -1,0 +1,22 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const adminInspectionController_1 = require("../controllers/adminInspectionController");
+const adminCarRequestController_1 = require("../controllers/adminCarRequestController");
+const adminController_1 = require("../controllers/adminController");
+const uploadPost_1 = require("../middleware/uploadPost");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = express_1.default.Router();
+router.get("/inspections", authMiddleware_1.admin, authMiddleware_1.protect, adminInspectionController_1.getAllInspections);
+router.patch("/inspections/:id", authMiddleware_1.protect, authMiddleware_1.admin, adminInspectionController_1.updateInspectionStatus);
+router.post("/sell-requests", authMiddleware_1.protect, uploadPost_1.upload.array("images", 20), adminController_1.create);
+router.get("/sell-requests", authMiddleware_1.admin, authMiddleware_1.protect, adminCarRequestController_1.getRequests);
+router.patch("/sell-requests/:id", authMiddleware_1.protect, authMiddleware_1.admin, adminCarRequestController_1.updateSellCarStatus);
+router.delete("/sell-requests/:id", authMiddleware_1.protect, authMiddleware_1.admin, adminCarRequestController_1.deleteSellCarRequest);
+router.post("/cars", authMiddleware_1.protect, authMiddleware_1.admin, uploadPost_1.upload.array("images", 20), adminController_1.create);
+router.patch("/cars/:id", authMiddleware_1.protect, authMiddleware_1.admin, adminController_1.updateCar);
+router.delete("/cars/:id", authMiddleware_1.protect, authMiddleware_1.admin, adminController_1.deleteCar);
+exports.default = router;

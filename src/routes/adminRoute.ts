@@ -12,11 +12,9 @@ import {
   create,
   updateCar,
   deleteCar,
-  getAllCars,
-  getCarById,
+ 
 } from "../controllers/adminController";
 import { upload } from "../middleware/uploadPost";
-// import { upload } from "../config/cloudinary";
 import { protect, admin } from "../middleware/authMiddleware";
 
 const router = express.Router();

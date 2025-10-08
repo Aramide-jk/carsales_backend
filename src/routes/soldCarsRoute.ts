@@ -1,6 +1,6 @@
 // routes/carRoutes.ts
 import express from "express";
-import { getSoldCars } from "../controllers/soldCarsController";
+import { getSoldCars } from "../controllers/soldcarsController";
 
 const router = express.Router();
 
