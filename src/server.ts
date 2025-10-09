@@ -23,17 +23,25 @@ import soldRoutes from "./routes/soldCarsRoute";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 const PORT =
-  process.env.PORT || process.env.PROD_PORT || process.env.DEV_PORT || 5000;
+  process.env.PORT ||
+  process.env.PROD_PORT ||
+  process.env.DEV_PORT ||
+  process.env.FRONTEND_URL_PRO ||
+  5000;
 
 const DB_URL =
   NODE_ENV === "production"
     ? process.env.MONGO_URI
     : process.env.LOCAL_MONGO_URI;
 
+// const FRONTEND_URL =
+//   NODE_ENV === "production"
+//     ? process.env.FRONTEND_URL
+//     : process.env.FRONTEND_URL_LOCAL;
 const FRONTEND_URL =
   NODE_ENV === "production"
-    ? process.env.FRONTEND_URL
-    : process.env.FRONTEND_URL_LOCAL;
+    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRO].filter(Boolean)
+    : [process.env.FRONTEND_URL_LOCAL];
 
 console.log("=================================");
 console.log(`NODE_ENV: ${NODE_ENV}`);
