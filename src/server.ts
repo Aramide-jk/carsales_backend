@@ -23,12 +23,13 @@ import soldRoutes from "./routes/soldCarsRoute";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // process.env.PORT || process.env.PROD_PORT || process.env.DEV_PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
-const PORT =
-  process.env.PORT ||
-  (NODE_ENV === "production"
-    ? process.env.PROD_PORT && process.env.FRONTEND_URL_PRO
-    : process.env.DEV_PORT);
+// const PORT =
+//   process.env.PORT ||
+//   (NODE_ENV === "production"
+//     ? process.env.PROD_PORT && process.env.FRONTEND_URL_PRO
+//     : process.env.DEV_PORT);
 
 const DB_URL =
   NODE_ENV === "production"
@@ -79,7 +80,7 @@ app.use(
 // Health check route (important for Railway)
 // --------------------
 app.get("/", (req, res) => {
-  res.send("✅ CarSales Backend is running successfully!");
+  res.send("CarSales Backend is running successfully!");
 });
 
 // --------------------
@@ -102,7 +103,7 @@ connectDB(DB_URL)
   .then(() => {
     if (NODE_ENV !== "test") {
       app.listen(PORT, () => {
-        console.log(`🚗 Server running in ${NODE_ENV} mode on port ${PORT}`);
+        console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
       });
     }
   })
