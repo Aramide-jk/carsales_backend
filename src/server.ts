@@ -17,6 +17,10 @@ import carRoute from "./routes/carRoute";
 import soldRoutes from "./routes/soldCarsRoute";
 // import { errorHandler } from "./middleware/errorMiddleware";
 
+const FRONTEND_URL_MAIN = process.env.FRONTEND_URL; // main frontend
+const FRONTEND_URL_ADMIN = process.env.FRONTEND_URL_PRO; // admin dashboard
+const FRONTEND_URL_LOCAL = process.env.FRONTEND_URL_LOCAL; // local dev
+const FRONTEND_URL_MAIN_LOCAL = process.env.FRONTEND_URL_VITE;
 // --------------------
 // Environment setup
 // --------------------
@@ -34,10 +38,6 @@ const DB_URL =
     ? process.env.MONGO_URI
     : process.env.LOCAL_MONGO_URI;
 
-// const FRONTEND_URL =
-//   NODE_ENV === "production"
-//     ? process.env.FRONTEND_URL
-//     : process.env.FRONTEND_URL_LOCAL;
 const FRONTEND_URL =
   NODE_ENV === "production"
     ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRO].filter(Boolean)
@@ -64,12 +64,16 @@ if (NODE_ENV === "development") app.use(morgan("dev"));
 // --------------------
 // CORS setup
 // --------------------
-const allowedOrigins = [
-  process.env.FRONTEND_URL_PRO,
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_LOCAL,
-  process.env.FRONTEND_URL_VITE,
-].filter((origin): origin is string => !!origin);
+const allowedOrigins: string[] = [
+  NODE_ENV === "production" ? FRONTEND_URL_MAIN : FRONTEND_URL_MAIN_LOCAL,
+  NODE_ENV === "production" ? FRONTEND_URL_ADMIN : FRONTEND_URL_LOCAL,
+].filter((url): url is string => !!url);
+// const allowedOrigins = [
+//   process.env.FRONTEND_URL_PRO,
+//   process.env.FRONTEND_URL,
+//   process.env.FRONTEND_URL_LOCAL,
+//   process.env.FRONTEND_URL_VITE,
+// ].filter((origin): origin is string => !!origin);
 
 app.use(
   cors({
