@@ -17,10 +17,10 @@ import carRoute from "./routes/carRoute";
 import soldRoutes from "./routes/soldCarsRoute";
 // import { errorHandler } from "./middleware/errorMiddleware";
 
-const FRONTEND_URL_MAIN = process.env.FRONTEND_URL; // main frontend
-const FRONTEND_URL_ADMIN = process.env.FRONTEND_URL_PRO; // admin dashboard
-const FRONTEND_URL_LOCAL = process.env.FRONTEND_URL_LOCAL; // local dev
-const FRONTEND_URL_MAIN_LOCAL = process.env.FRONTEND_URL_VITE;
+const FRONTEND_URL_MAIN = process.env.FRONTEND_URL; 
+const FRONTEND_URL_ADMIN = process.env.FRONTEND_URL_PRO; 
+const FRONTEND_URL_LOCAL = process.env.FRONTEND_URL_LOCAL; 
+// const FRONTEND_URL_MAIN_LOCAL = process.env.FRONTEND_URL_VITE;
 // --------------------
 // Environment setup
 // --------------------
@@ -40,7 +40,7 @@ const DB_URL =
 
 const FRONTEND_URL =
   NODE_ENV === "production"
-    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRO].filter(Boolean)
+    ? [ process.env.FRONTEND_URL_PRO].filter(Boolean)
     : [process.env.FRONTEND_URL_LOCAL];
 
 console.log("=================================");
