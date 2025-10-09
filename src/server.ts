@@ -22,14 +22,8 @@ import soldRoutes from "./routes/soldCarsRoute";
 // --------------------
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// process.env.PORT || process.env.PROD_PORT || process.env.DEV_PORT || 5000;
-// const PORT = process.env.PORT || 5000;
-
 const PORT =
-  process.env.PORT ||
-  (NODE_ENV === "production"
-    ? process.env.PROD_PORT && process.env.FRONTEND_URL_PRO
-    : process.env.DEV_PORT);
+  process.env.PORT || process.env.PROD_PORT || process.env.DEV_PORT || 5000;
 
 const DB_URL =
   NODE_ENV === "production"
@@ -63,8 +57,8 @@ if (NODE_ENV === "development") app.use(morgan("dev"));
 // CORS setup
 // --------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_PRO,
+  process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_LOCAL,
   process.env.FRONTEND_URL_VITE,
 ].filter((origin): origin is string => !!origin);
@@ -113,4 +107,3 @@ connectDB(DB_URL)
   });
 
 export default app;
-
