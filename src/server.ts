@@ -23,16 +23,13 @@ const NODE_ENV = process.env.NODE_ENV ?? "development";
 const isDevelopment = NODE_ENV === "development";
 const isProduction = NODE_ENV === "production";
 
-
 const PORT = isProduction
-  ? process.env.PROD_PORT ?? 8000
+  ? process.env.PORT ?? 8000
   : process.env.DEV_PORT ?? 5000;
-
 
 const DB_URL = isProduction
   ? process.env.MONGO_URI
   : process.env.LOCAL_MONGO_URI;
-
 
 const allowedOrigins = (
   isProduction
@@ -62,7 +59,6 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-   
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -77,18 +73,16 @@ app.use(
   })
 );
 
-// Logging middleware (development only)
 if (isDevelopment) {
   app.use(morgan("dev"));
 } else {
-  app.use(morgan("combined")); 
+  app.use(morgan("combined"));
 }
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-// Trust proxy (important for production behind reverse proxies)
 if (isProduction) {
   app.set("trust proxy", 1);
 }
@@ -126,9 +120,6 @@ app.use("/api", soldRoutes);
 app.use("/api/sell-requests", sellRoutes);
 app.use("/api/email", sendEmailRoutes);
 
-// --------------------
-// 404 Handler (must be after all routes)
-// --------------------
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -136,18 +127,14 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// --------------------
-// Error Handler (must be last)
-// --------------------
 app.use(errorHandler);
 
-// --------------------
-// Database Connection & Server Start
-// --------------------
 if (!DB_URL) {
   console.error("FATAL ERROR: Database connection string is not defined.");
   console.error(
-    `Please set ${isProduction ? "MONGO_URI" : "LOCAL_MONGO_URI"} in your .env file`
+    `Please set ${
+      isProduction ? "MONGO_URI" : "LOCAL_MONGO_URI"
+    } in your .env file`
   );
   process.exit(1);
 }
@@ -157,9 +144,7 @@ connectDB(DB_URL)
     if (NODE_ENV !== "test") {
       const server = app.listen(PORT, () => {
         console.log(`Server started successfully on port ${PORT}`);
-        console.log(
-          `Environment: ${NODE_ENV.toUpperCase()}`
-        );
+        console.log(`Environment: ${NODE_ENV.toUpperCase()}`);
       });
 
       // Graceful shutdown
@@ -190,13 +175,6 @@ connectDB(DB_URL)
   });
 
 export default app;
-
-
-
-
-
-
-
 
 // import dotenv from "dotenv";
 // dotenv.config();
@@ -427,4 +405,3 @@ export default app;
 //   });
 
 // export default app;
-

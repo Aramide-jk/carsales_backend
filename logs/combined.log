@@ -1141,3 +1141,5 @@
 {"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-01.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-12 14:30:16"}
 {"level":"error","message":"💥 Error: Invalid credentials","service":"jk-autos-backend","stack":"Error: Invalid credentials\n    at C:\\Users\\aramj\\Desktop\\ReactDoc\\projects\\Jk_Autos\\backend\\src\\controllers\\authController.ts:57:11\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)","timestamp":"2025-10-12 15:18:21"}
 {"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-00.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-12 15:48:37"}
+{"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-00.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-12 15:53:18"}
+{"level":"info","message":"MongoDB connected: ac-zendqec-shard-00-00.gste3rw.mongodb.net","service":"jk-autos-backend","timestamp":"2025-10-12 23:47:59"}
