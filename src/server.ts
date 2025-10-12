@@ -1,3 +1,203 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+import express, { Application, Request, Response } from "express";
+import cors from "cors";
+import morgan from "morgan";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import connectDB from "./config/db";
+
+// --- Route Imports ---
+import authRoutes from "./routes/authRoute";
+import inspectionRoutes from "./routes/inspectionRoute";
+import adminRoutes from "./routes/adminRoute";
+import sellRoutes from "./routes/sellCarRequestRoutes";
+import sendEmailRoutes from "./routes/sendEmailRoute";
+import carRoute from "./routes/carRoute";
+import soldRoutes from "./routes/soldCarsRoute";
+import { errorHandler } from "./middleware/errorMiddleware";
+
+// --- Environment Setup ---
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const isDevelopment = NODE_ENV === "development";
+const isProduction = NODE_ENV === "production";
+
+
+const PORT = isProduction
+  ? process.env.PROD_PORT ?? 8000
+  : process.env.DEV_PORT ?? 5000;
+
+
+const DB_URL = isProduction
+  ? process.env.MONGO_URI
+  : process.env.LOCAL_MONGO_URI;
+
+
+const allowedOrigins = (
+  isProduction
+    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRO]
+    : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
+).filter((origin): origin is string => !!origin);
+
+// --- Startup Logs ---
+console.log("=================================");
+console.log(`NODE_ENV: ${NODE_ENV}`);
+console.log(`PORT: ${PORT}`);
+console.log(`DB_URL: ${DB_URL ? "Configured" : "MISSING"}`);
+console.log(`Allowed Origins: ${allowedOrigins.join(", ")}`);
+console.log("=================================");
+
+const app: Application = express();
+
+// --------------------
+// Security & Middlewares
+// --------------------
+app.use(
+  helmet({
+    contentSecurityPolicy: isProduction ? undefined : false,
+  })
+);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+   
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Logging middleware (development only)
+if (isDevelopment) {
+  app.use(morgan("dev"));
+} else {
+  app.use(morgan("combined")); 
+}
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
+
+// Trust proxy (important for production behind reverse proxies)
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
+
+// --------------------
+// Health Check Route
+// --------------------
+app.get("/", (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    message: `CarSales Backend is running successfully`,
+    environment: NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// API Health Check
+app.get("/api/health", (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    status: "healthy",
+    environment: NODE_ENV,
+    uptime: process.uptime(),
+  });
+});
+
+// --------------------
+// API Routes
+// --------------------
+app.use("/api/auth", authRoutes);
+app.use("/api/inspections", inspectionRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api", carRoute);
+app.use("/api", soldRoutes);
+app.use("/api/sell-requests", sellRoutes);
+app.use("/api/email", sendEmailRoutes);
+
+// --------------------
+// 404 Handler (must be after all routes)
+// --------------------
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`,
+  });
+});
+
+// --------------------
+// Error Handler (must be last)
+// --------------------
+app.use(errorHandler);
+
+// --------------------
+// Database Connection & Server Start
+// --------------------
+if (!DB_URL) {
+  console.error("FATAL ERROR: Database connection string is not defined.");
+  console.error(
+    `Please set ${isProduction ? "MONGO_URI" : "LOCAL_MONGO_URI"} in your .env file`
+  );
+  process.exit(1);
+}
+
+connectDB(DB_URL)
+  .then(() => {
+    if (NODE_ENV !== "test") {
+      const server = app.listen(PORT, () => {
+        console.log(`Server started successfully on port ${PORT}`);
+        console.log(
+          `Environment: ${NODE_ENV.toUpperCase()}`
+        );
+      });
+
+      // Graceful shutdown
+      const gracefulShutdown = (signal: string) => {
+        console.log(`\n${signal} received. Starting graceful shutdown...`);
+        server.close(() => {
+          console.log("HTTP server closed");
+          process.exit(0);
+        });
+
+        // Force shutdown after 10 seconds
+        setTimeout(() => {
+          console.error("Forced shutdown after timeout");
+          process.exit(1);
+        }, 10000);
+      };
+
+      process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+      process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+    }
+  })
+  .catch((err) => {
+    console.error(`Database Connection Failed! Error: ${err.message}`);
+    console.error(
+      "Please ensure your MongoDB service is running and accessible."
+    );
+    process.exit(1);
+  });
+
+export default app;
+
+
+
+
+
+
+
+
 // import dotenv from "dotenv";
 // dotenv.config();
 // import express, { Application } from "express";
@@ -117,117 +317,114 @@
 
 // export default app;
 
-import dotenv from "dotenv";
-dotenv.config();
+// import dotenv from "dotenv";
+// dotenv.config();
 
-import express, { Application, Request, Response } from "express"; 
-import cors from "cors";
-import morgan from "morgan";
-import helmet from "helmet";
-import cookieParser from "cookie-parser";
-import connectDB from "./config/db";
+// import express, { Application, Request, Response } from "express";
+// import cors from "cors";
+// import morgan from "morgan";
+// import helmet from "helmet";
+// import cookieParser from "cookie-parser";
+// import connectDB from "./config/db";
 
-// --- Route Imports ---
-import authRoutes from "./routes/authRoute";
-import inspectionRoutes from "./routes/inspectionRoute";
-import adminRoutes from "./routes/adminRoute";
-import sellRoutes from "./routes/sellCarRequestRoutes";
-import sendEmailRoutes from "./routes/sendEmailRoute";
-import carRoute from "./routes/carRoute";
-import soldRoutes from "./routes/soldCarsRoute";
-import { errorHandler } from "./middleware/errorMiddleware";
+// // --- Route Imports ---
+// import authRoutes from "./routes/authRoute";
+// import inspectionRoutes from "./routes/inspectionRoute";
+// import adminRoutes from "./routes/adminRoute";
+// import sellRoutes from "./routes/sellCarRequestRoutes";
+// import sendEmailRoutes from "./routes/sendEmailRoute";
+// import carRoute from "./routes/carRoute";
+// import soldRoutes from "./routes/soldCarsRoute";
+// import { errorHandler } from "./middleware/errorMiddleware";
 
-// --- Environment Setup ---
-const NODE_ENV = process.env.NODE_ENV ?? "development";
-const PORT = process.env.PORT ?? 5000;
+// // --- Environment Setup ---
+// const NODE_ENV = process.env.NODE_ENV ?? "development";
+// const PORT = process.env.PORT ?? 5000;
 
+// const DB_URL =
+//   NODE_ENV === "production"
+//     ? process.env.MONGO_URI
+//     : process.env.LOCAL_MONGO_URI;
 
-const DB_URL =
-  NODE_ENV === "production"
-    ? process.env.MONGO_URI 
-    : process.env.LOCAL_MONGO_URI; 
+// const allowedOrigins = [
+//   process.env.FRONTEND_URL,
+//   process.env.FRONTEND_URL_PRO,
+//   process.env.FRONTEND_URL_LOCAL,
+//   process.env.FRONTEND_URL_VITE,
+// ].filter((origin): origin is string => !!origin);
 
+// console.log("=================================");
+// console.log(`NODE_ENV: ${NODE_ENV}`);
+// console.log(`PORT: ${PORT}`);
+// // console.log(`DB_URL: ${DB_URL ? "Defined" : "UNDEFINED"}`);
+// console.log(`Allowed Origins: ${allowedOrigins.join(", ")}`);
+// console.log("=================================");
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_PRO,
-  process.env.FRONTEND_URL_LOCAL,
-  process.env.FRONTEND_URL_VITE, 
-].filter((origin): origin is string => !!origin);
+// const app: Application = express();
 
-console.log("=================================");
-console.log(`NODE_ENV: ${NODE_ENV}`);
-console.log(`PORT: ${PORT}`);
-// console.log(`DB_URL: ${DB_URL ? "Defined" : "UNDEFINED"}`);
-console.log(`Allowed Origins: ${allowedOrigins.join(", ")}`);
-console.log("=================================");
+// // --------------------
+// // Middlewares
+// // --------------------
+// app.use(helmet());
+// app.use(
+//   cors({
+//     origin: allowedOrigins,
+//     credentials: true,
+//   })
+// );
+// if (NODE_ENV === "development") {
+//   app.use(morgan("dev"));
+// }
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+// app.use(cookieParser());
 
-const app: Application = express();
+// // --------------------
+// // Health check route
+// // --------------------
+// app.get("/", (req: Request, res: Response) => {
+//   res.send(`CarSales Backend is running successfully in ${NODE_ENV} mode!`);
+// });
 
-// --------------------
-// Middlewares
-// --------------------
-app.use(helmet());
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
-if (NODE_ENV === "development") {
-  app.use(morgan("dev"));
-}
-app.use(express.json()); 
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+// // --------------------
+// // Routes
+// // --------------------
+// app.use("/api/auth", authRoutes);
+// app.use("/api/inspections", inspectionRoutes);
+// app.use("/api/admin", adminRoutes);
+// app.use("/api", carRoute);
+// app.use("/api", soldRoutes);
+// app.use("/api/sell-requests", sellRoutes);
+// app.use("/api/email", sendEmailRoutes);
 
-// --------------------
-// Health check route
-// --------------------
-app.get("/", (req: Request, res: Response) => {
-  res.send(`CarSales Backend is running successfully in ${NODE_ENV} mode!`);
-});
+// // --------------------
 
-// --------------------
-// Routes
-// --------------------
-app.use("/api/auth", authRoutes);
-app.use("/api/inspections", inspectionRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api", carRoute);
-app.use("/api", soldRoutes);
-app.use("/api/sell-requests", sellRoutes);
-app.use("/api/email", sendEmailRoutes);
+// app.use(errorHandler);
 
-// --------------------
+// // --------------------
+// // Database Connection & Server Start
+// // --------------------
+// if (!DB_URL) {
+//   console.error("FATAL ERROR: Database connection string is not defined.");
 
-app.use(errorHandler);
+//   process.exit(1);
+// }
 
-// --------------------
-// Database Connection & Server Start
-// --------------------
-if (!DB_URL) {
-  console.error("FATAL ERROR: Database connection string is not defined.");
+// connectDB(DB_URL)
+//   .then(() => {
+//     if (NODE_ENV !== "test") {
+//       app.listen(PORT, () => {
+//         console.log(`Server started successfully on port ${PORT}`);
+//       });
+//     }
+//   })
+//   .catch((err) => {
+//     console.error(`Database Connection Failed! Error: ${err.message}`);
+//     console.error(
+//       "Please ensure your MongoDB service is running and accessible."
+//     );
+//     process.exit(1);
+//   });
 
-  process.exit(1);
-}
+// export default app;
 
-connectDB(DB_URL)
-  .then(() => {
-   
-    if (NODE_ENV !== "test") {
-      app.listen(PORT, () => {
-        console.log(`Server started successfully on port ${PORT}`);
-      });
-    }
-  })
-  .catch((err) => {
-    
-    console.error(`Database Connection Failed! Error: ${err.message}`);
-    console.error(
-      "Please ensure your MongoDB service is running and accessible."
-    );
-    process.exit(1);
-  });
-
-export default app;

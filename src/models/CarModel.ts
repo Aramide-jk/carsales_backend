@@ -41,7 +41,7 @@ const carSchema = new Schema<ICar>(
       default: "available",
     },
     location: { type: String, required: true },
-    images: [{ type: String }], //
+    images: [{ type: String }], 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -15,7 +15,7 @@ export const create = async (req: AuthRequest, res: Response) => {
       fuelType,
       mileage,
       transmission,
-      condition = "local used",
+      condition = "foreign used",
       engine,
       status = "available",
       location,
@@ -44,7 +44,6 @@ export const create = async (req: AuthRequest, res: Response) => {
 
       uploadedUrls = files.map((file: any) => file.path);
     } else if (req.body.images && Array.isArray(req.body.images)) {
-      // Optional: Accept existing Cloudinary URLs from body
       uploadedUrls = req.body.images;
     }
 
@@ -113,15 +112,12 @@ export const updateCar = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Build update object
     const updateData: any = { ...req.body };
 
-    // Handle uploaded image (if any)
     if (req.file) {
       updateData.image = `/uploads/${req.file.filename}`;
     }
 
-    // Ensure year and price are numbers (FormData sends as strings)
     if (updateData.year) updateData.year = Number(updateData.year);
     if (updateData.price) updateData.price = Number(updateData.price);
 
@@ -164,16 +160,50 @@ export const deleteCar = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// export const getAllCars = async (
+//   req: Request,
+//   res: Response
+// ): Promise<void> => {
+//   try {
+//     const cars = await Car.find()
+//       .populate("createdBy", "name email")
+//       .sort({ createdAt: -1 });
+//     // res.json(cars);
+//     res.status(200).json({ success: true, count: cars.length, data: cars });
+//   } catch (error: any) {
+//     logger.error("Error fetching cars: %s", error.message, {
+//       stack: error.stack,
+//     });
+//     res
+//       .status(500)
+//       .json({ success: false, message: "Server error while fetching cars" });
+//   }
+// };
 export const getAllCars = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 16;
+    const skip = (page - 1) * limit;
+
     const cars = await Car.find()
       .populate("createdBy", "name email")
-      .sort({ createdAt: -1 });
-    // res.json(cars);
-    res.status(200).json({ success: true, count: cars.length, data: cars });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalCars = await Car.countDocuments();
+
+    res.status(200).json({
+      success: true,
+      count: cars.length,
+      currentPage: page,
+      totalPages: Math.ceil(totalCars / limit),
+      totalCars,
+      data: cars,
+    });
   } catch (error: any) {
     logger.error("Error fetching cars: %s", error.message, {
       stack: error.stack,
