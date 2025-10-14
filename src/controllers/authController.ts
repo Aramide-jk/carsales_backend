@@ -13,7 +13,7 @@ const generateToken = (id: string, role: string) => {
 
 export const registerUser = asyncHandler(
   async (req: Request, res: Response) => {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
@@ -25,6 +25,7 @@ export const registerUser = asyncHandler(
     const user = new User({
       name,
       email,
+      phone,
       password,
       role: role || "user",
     });
@@ -35,6 +36,7 @@ export const registerUser = asyncHandler(
       _id: user.id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: user.role,
       token: generateToken(user.id, user.role),
     });

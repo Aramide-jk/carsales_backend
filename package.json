@@ -17,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
@@ -31,7 +32,7 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
-    "nodemailer": "^7.0.6",
+    "nodemailer": "^7.0.9",
     "resend": "^6.1.2",
     "winston": "^3.17.0"
   },

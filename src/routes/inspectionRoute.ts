@@ -12,7 +12,7 @@ const router = express.Router();
 router.post("/", protect, bookInspection);
 
 // Admin views + updates inspections
-router.get("/", protect, admin, getAllInspections);
+router.get("/", protect, getAllInspections);
 router.patch("/:id/status", protect, admin, updateInspection);
 
 export default router;

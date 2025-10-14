@@ -107,24 +107,82 @@ export const getRequests = async (req: Request, res: Response) => {
   }
 };
 
+// export const updateSellCarStatus = async (req: Request, res: Response) => {
+//   try {
+//     const { id } = req.params;
+//     const { status } = req.body;
+
+//     // Validate status input
+//     if (!["pending", "approved", "rejected"].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid status value. Allowed: pending, approved, rejected",
+//       });
+//     }
+
+//     // Find request
+//     const request = await SellCar.findById(id).populate<{ user: IUser }>(
+//       "user",
+//       "name email"
+//     );
+//     if (!request) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Sell request not found",
+//       });
+//     }
+
+//     // Update status
+//     request.status = status;
+//     await request.save();
+
+//     // Send email notification
+//     if (request.user) {
+//       const subject = `Your car sell request has been ${status}`;
+//       const message = `
+//         Hi ${request.user.name || "User"},
+
+//         Your request to sell your car has been *${status}*.
+
+//         Thank you for using JK Autos.
+//       `;
+
+//       try {
+//         await sendEmail(request.user.email, subject, message);
+//       } catch (mailError) {
+//         console.error("Email sending failed:", mailError);
+//       }
+//     }
+
+//     return res.status(200).json(request);
+//   } catch (error) {
+//     console.error("Error updating sell car status:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error while updating sell request",
+//     });
+//   }
+// };
 export const updateSellCarStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Validate status input
-    if (!["pending", "approved", "rejected"].includes(status)) {
+    // ✅ Validate status
+    const allowedStatuses = ["pending", "approved", "rejected"];
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status value. Allowed: pending, approved, rejected",
+        message: `Invalid status. Allowed values: ${allowedStatuses.join(", ")}`,
       });
     }
 
-    // Find request
+    // ✅ Find the sell request and populate the user
     const request = await SellCar.findById(id).populate<{ user: IUser }>(
       "user",
       "name email"
     );
+
     if (!request) {
       return res.status(404).json({
         success: false,
@@ -132,34 +190,56 @@ export const updateSellCarStatus = async (req: Request, res: Response) => {
       });
     }
 
-    // Update status
+    // ✅ Update status
     request.status = status;
     await request.save();
 
-    // Send email notification
-    if (request.user) {
+    // ✅ Prepare email
+    const userName = request.user?.name || "Customer";
+    const userEmail = request.user?.email;
+
+    if (userEmail) {
       const subject = `Your car sell request has been ${status}`;
-      const message = `
-        Hi ${request.user.name || "User"},
-
-        Your request to sell your car has been *${status}*.
-
-        Thank you for using JK Autos.
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color: #007bff;">Hello ${userName},</h2>
+          <p>Your car sell request has been <b style="text-transform: capitalize;">${status}</b>.</p>
+          ${
+            status === "approved"
+              ? `<p>🎉 Congratulations! Your request was approved. Our team will contact you soon for the next steps.</p>`
+              : status === "rejected"
+              ? `<p>Unfortunately, your request was rejected. You may contact support for more details.</p>`
+              : `<p>Your request is currently pending. We’ll update you once it’s reviewed.</p>`
+          }
+          <br />
+          <p>Thank you for choosing <b>JK Autos</b>.</p>
+          <p style="font-size: 13px; color: #666;">This is an automated message. Please do not reply.</p>
+        </div>
       `;
 
       try {
-        await sendEmail(request.user.email, subject, message);
-      } catch (mailError) {
-        console.error("Email sending failed:", mailError);
+        await sendEmail({
+          to: userEmail,
+          subject,
+          html: htmlContent,
+        });
+        console.log(`✅ Email sent to ${userEmail} for status: ${status}`);
+      } catch (emailError) {
+        console.error("❌ Failed to send email:", emailError);
       }
     }
 
-    return res.status(200).json(request);
+    // ✅ Return response
+    return res.status(200).json({
+      success: true,
+      message: "Sell car request status updated successfully",
+      data: request,
+    });
   } catch (error) {
-    console.error("Error updating sell car status:", error);
+    console.error("❌ Error updating sell car status:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while updating sell request",
+      message: "Server error while updating sell car status",
     });
   }
 };

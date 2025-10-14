@@ -8,18 +8,13 @@ import {
   updateSellCarStatus,
   deleteSellCarRequest,
 } from "../controllers/adminCarRequestController";
-import {
-  create,
-  updateCar,
-  deleteCar,
- 
-} from "../controllers/adminController";
+import { create, updateCar, deleteCar } from "../controllers/adminController";
 import { upload } from "../middleware/uploadPost";
 import { protect, admin } from "../middleware/authMiddleware";
 
 const router = express.Router();
 
-router.get("/inspections", admin, protect, getAllInspections);
+router.get("/inspections", protect, getAllInspections);
 router.patch("/inspections/:id", protect, admin, updateInspectionStatus);
 
 router.post("/sell-requests", protect, upload.array("images", 20), create);

@@ -86,28 +86,6 @@ export const create = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// export const updateCar = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const car = await Car.findById(req.params.id);
-
-//     if (!car) {
-//       res.status(404).json({ success: false, message: "Car not found" });
-//       return;
-//     }
-
-//     Object.assign(car, req.body);
-//     const updatedCar = await car.save();
-
-//     res.status(200).json({ success: true, data: updatedCar });
-//   } catch (error: any) {
-//     logger.error("Error updating car: %s", error.message, {
-//       stack: error.stack,
-//     });
-//     res
-//       .status(500)
-//       .json({ success: false, message: "Server error while updating car" });
-//   }
-// };
 export const updateCar = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

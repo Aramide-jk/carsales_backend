@@ -13,8 +13,9 @@ import authRoutes from "./routes/authRoute";
 import inspectionRoutes from "./routes/inspectionRoute";
 import adminRoutes from "./routes/adminRoute";
 import sellRoutes from "./routes/sellCarRequestRoutes";
-import sendEmailRoutes from "./routes/sendEmailRoute";
+// import sendEmailRoutes from "./routes/sendEmailRoute";
 import carRoute from "./routes/carRoute";
+import contactRoutes from "./routes/contactRoute";
 import soldRoutes from "./routes/soldCarsRoute";
 import { errorHandler } from "./middleware/errorMiddleware";
 
@@ -118,7 +119,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api", carRoute);
 app.use("/api", soldRoutes);
 app.use("/api/sell-requests", sellRoutes);
-app.use("/api/email", sendEmailRoutes);
+app.use("/api/contact", contactRoutes);
+// app.use("/api/email", sendEmailRoutes);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({
