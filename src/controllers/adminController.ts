@@ -166,13 +166,15 @@ export const getAllCars = async (
     const limit = parseInt(req.query.limit as string) || 16;
     const skip = (page - 1) * limit;
 
-    const cars = await Car.find()
+    const query = { status: "available" };
+
+    const cars = await Car.find(query)
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalCars = await Car.countDocuments();
+    const totalCars = await Car.countDocuments(query);
 
     res.status(200).json({
       success: true,

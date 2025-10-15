@@ -30,7 +30,7 @@ export const handleContactForm = asyncHandler(
       throw new Error("Please provide a valid email address.");
     }
 
-    const adminEmail = process.env.EMAIL_USER;
+    const adminEmail = process.env.ADMIN_EMAIL;
     if (!adminEmail) {
       console.error("FATAL: ADMIN_EMAIL is not defined in .env file.");
       res.status(500);
