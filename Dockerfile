@@ -4,10 +4,8 @@
 FROM public.ecr.aws/docker/library/node:18 AS build
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci
-
 COPY . .
 RUN npm run build
 
@@ -17,10 +15,8 @@ RUN npm run build
 FROM public.ecr.aws/docker/library/node:18
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci --only=production
-
 COPY --from=build /app/dist ./dist
 
 ENV NODE_ENV=production
