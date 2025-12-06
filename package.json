@@ -7,7 +7,7 @@
     "predev": "rm -rf dist",
     "dev": "cross-env NODE_ENV=development ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "rm -rf dist && tsc",
-    "start": "cross-env NODE_ENV=production node dist/server.js"
+    "start": "NODE_ENV=production node dist/server.js"
   },
   "files.associations": {
     ".env.*": "dotenv"
