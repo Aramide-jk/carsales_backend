@@ -26,4 +26,5 @@ COPY --from=build /app/dist ./dist
 ENV NODE_ENV=production
 EXPOSE 8000
 
-CMD ["npm", "start"]
+CMD ["node", "dist/server.js"]
+
