@@ -37,7 +37,7 @@ const allowedOrigins = (
     ? [
         process.env.FRONTEND_URL,
         process.env.FRONTEND_URL_PRO,
-        "https://d9w8zeq3wumnp.cloudfront.net",
+        process.env.FRONTEND_URL_CDN,
       ]
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
 ).filter((origin): origin is string => !!origin);
