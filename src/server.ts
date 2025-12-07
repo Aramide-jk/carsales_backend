@@ -34,7 +34,11 @@ const DB_URL = isProduction
 
 const allowedOrigins = (
   isProduction
-    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRO]
+    ? [
+        process.env.FRONTEND_URL,
+        process.env.FRONTEND_URL_PRO,
+        "https://d9w8zeq3wumnp.cloudfront.net",
+      ]
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
 ).filter((origin): origin is string => !!origin);
 
@@ -75,7 +79,6 @@ app.use(
 );
 
 if (isDevelopment) {
-  
   app.use(morgan("dev"));
 } else {
   app.use(morgan("combined"));
