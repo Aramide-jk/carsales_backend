@@ -10,6 +10,7 @@ const generateToken = (id: string, role: string) => {
     expiresIn: "30d",
   });
 };
+console.log("JWT Secret Loaded:", process.env.JWT_SECRET);
 
 export const registerUser = asyncHandler(
   async (req: Request, res: Response) => {
