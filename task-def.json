@@ -1,10 +1,14 @@
 {
   "family": "backend-task",
   "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+
   "containerDefinitions": [
     {
       "name": "backend-container",
-      "image": "AWS_ECR_URI:latest",
+      "image": "<IMAGE_URI>", 
       "essential": true,
       "portMappings": [
         {
@@ -26,8 +30,5 @@
         }
       }
     }
-  ],
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512"
+  ]
 }
