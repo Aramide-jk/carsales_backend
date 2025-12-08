@@ -51,7 +51,7 @@ jobs:
 
     # ⬇️ FIXED — Added AWS credentials & region
     - name: Deploy to ECS
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         service: backend-service
         cluster: jk-cluster
