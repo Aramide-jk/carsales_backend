@@ -42,7 +42,7 @@ jobs:
     # ⬇️ Ensure task-def.json exists (You must add this step!)
     - name: Generate ECS Task Definition
       run: |
-        cat task-def.json \
+        cat ecs-task-def.json \
         | sed "s|AWS_ECR_URI|${{ secrets.AWS_ECR_URI }}|g" \
         | sed "s|IMAGE_TAG|${{ github.sha }}|g" \
         | sed "s|NODE_ENV|${{ secrets.NODE_ENV }}|g" \
