@@ -2,9 +2,10 @@
   "family": "backend-task",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
-  
+  "cpu": "512",                // 0.5 vCPU, adjust if your service needs more
+  "memory": "1024",            // 1 GB RAM, adjust as needed
+  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ecsTaskRole",
   "containerDefinitions": [
     {
       "name": "backend-container",
@@ -13,12 +14,13 @@
       "portMappings": [
         {
           "containerPort": 8000,
-          "hostPort": 8000
+          "hostPort": 8000,
+          "protocol": "tcp"
         }
       ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
-        { "name": "MONG_URI", "value": "mongodb+srv://jkautos:Aramide123@cluster0.gste3rw.mongodb.net/car_sales" },
+        { "name": "MONG_URI", "value": "<MONG_URI>" },
         { "name": "PROD_PORT", "value": "8000" }
       ],
       "logConfiguration": {
@@ -28,6 +30,13 @@
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
       }
     }
   ]
