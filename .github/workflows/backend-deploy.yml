@@ -55,7 +55,7 @@ jobs:
       with:
         service: backend-service
         cluster: jk-cluster
-        task-definition: task-def.json
+        task-definition: ../../task-def.json
         image: ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
         wait-for-service-stability: true
       env:
