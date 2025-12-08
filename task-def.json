@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "backend-container",
-      "image": "<IMAGE>",
+      "image": "sed",
       "essential": true,
       "portMappings": [
         {
