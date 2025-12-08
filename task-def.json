@@ -4,11 +4,11 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-
+  
   "containerDefinitions": [
     {
       "name": "backend-container",
-      "image": "<IMAGE_URI>", 
+      "image": "<IMAGE>",
       "essential": true,
       "portMappings": [
         {
