@@ -56,9 +56,9 @@ jobs:
           docker push ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
 
       # 9️⃣ Update ECS task definition with the new image
-      - name: Update ECS image in task definition
+      - name: Update task definition image tag
         run: |
-          sed -i "s|<IMAGE>|${{ secrets.AWS_ECR_URI }}:${{ github.sha }}|g" task-def.json
+          sed -i "s|:latest|:${{ github.sha }}|g" task-def.json
 
       # 🔟 Deploy to ECS
       - name: Deploy to ECS
