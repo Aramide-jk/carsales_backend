@@ -1,6 +1,5 @@
 name: Backend CI/CD - Production
 
-# Trigger deploy on push to main branch
 on:
   push:
     branches:
@@ -12,11 +11,11 @@ jobs:
     environment: production
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout code
+      # 1️⃣ Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up Node.js
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -39,43 +38,29 @@ jobs:
       - name: Login to AWS ECR
         uses: aws-actions/amazon-ecr-login@v2
         with:
-          region: ${{ secrets.AWS_REGION }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          registries: ${{ secrets.AWS_ECR_URI }}
 
-      # 7️⃣ Tag Docker image
+      # 7️⃣ Tag Docker image (SHA + latest)
       - name: Tag Docker image
         run: |
-          docker tag backend:${{ github.sha }} 734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-repo:${{ github.sha }}
+          docker tag backend:${{ github.sha }} ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
+          docker tag backend:${{ github.sha }} ${{ secrets.AWS_ECR_URI }}:latest
 
       # 8️⃣ Push Docker image to ECR
       - name: Push Docker image
         run: |
-          docker push 734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-repo:${{ github.sha }}
+          docker push ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
+          docker push ${{ secrets.AWS_ECR_URI }}:latest
 
-      # 9️⃣ Update ECS task definition with the new image
-      - name: Update task definition image tag
-        run: |
-          sed -i "s|:latest|:${{ github.sha }}|g" task-def.json
-
-      # 🔟 Deploy to ECS
+      # 9️⃣ Deploy to ECS
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: task-def.json
-          service: backend-service         # replace with your ECS service name
-          cluster: jk-cluster              # replace with your ECS cluster name
+          service: backend-service
+          cluster: jk-cluster
           wait-for-service-stability: true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-
-      # 1️⃣1️⃣ Optional: Run database migrations
-      - name: Run Database Migrations
-        run: npm run migrate:prod
-        env:
-          NODE_ENV: production
-          MONG_URI: ${{ secrets.MONG_URI }}
