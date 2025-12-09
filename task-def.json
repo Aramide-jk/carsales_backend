@@ -19,7 +19,7 @@
       ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
-        { "name": "MONG_URI", "value": "<MONG_URI>" },
+        { "name": "MONG_URI", "value": "${MONG_URI}" },
         { "name": "PROD_PORT", "value": "8000" }
       ]
     }
