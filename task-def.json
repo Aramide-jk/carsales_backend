@@ -8,7 +8,7 @@
   "containerDefinitions": [
     {
       "name": "backend-container",
-      "image": "734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-backend:latest",
+      "image": "<AWS_ECR_URI>:latest",
       "essential": true,
       "portMappings": [
         {
@@ -21,7 +21,14 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "MONG_URI", "value": "${MONG_URI}" },
         { "name": "PROD_PORT", "value": "8000" }
-      ]
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      }
     }
   ]
 }
