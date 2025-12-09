@@ -38,6 +38,7 @@ jobs:
       - name: Login to AWS ECR
         uses: aws-actions/amazon-ecr-login@v2
         with:
+          region: ${{ secrets.AWS_REGION }}
           registries: ${{ secrets.AWS_ECR_URI }}
 
       # 7️⃣ Tag Docker image (SHA + latest)
