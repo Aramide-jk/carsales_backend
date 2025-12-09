@@ -21,22 +21,7 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "MONG_URI", "value": "<MONG_URI>" },
         { "name": "PROD_PORT", "value": "8000" }
-      ],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/backend",
-          "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      },
-      "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
-        "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 10
-      }
+      ]
     }
   ]
 }
