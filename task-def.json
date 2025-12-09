@@ -4,7 +4,7 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",                
   "memory": "1024",            
-  "executionRoleArn": "arn:aws:iam::734649603753:role/ecsTaskExecutionRole"
+  "executionRoleArn": "arn:aws:iam::734649603753:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "backend-container",
