@@ -2,13 +2,13 @@
   "family": "backend-task",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
-  "cpu": "512",                
-  "memory": "1024",            
+  "cpu": "512",
+  "memory": "1024",
   "executionRoleArn": "arn:aws:iam::734649603753:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "backend-container",
-      "image": "sed",
+      "image": "734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-repo:latest",
       "essential": true,
       "portMappings": [
         {
