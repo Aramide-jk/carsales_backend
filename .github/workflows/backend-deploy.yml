@@ -48,12 +48,12 @@ jobs:
       # 7️⃣ Tag Docker image
       - name: Tag Docker image
         run: |
-          docker tag backend:${{ github.sha }} ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
+          docker tag backend:${{ github.sha }} 734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-repo:${{ github.sha }}
 
       # 8️⃣ Push Docker image to ECR
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.AWS_ECR_URI }}:${{ github.sha }}
+          docker push 734649603753.dkr.ecr.us-east-1.amazonaws.com/jk-repo:${{ github.sha }}
 
       # 9️⃣ Update ECS task definition with the new image
       - name: Update task definition image tag
