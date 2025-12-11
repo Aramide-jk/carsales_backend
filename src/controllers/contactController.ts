@@ -65,7 +65,7 @@ export const handleContactForm = asyncHandler(
     });
 
     // --- 3. Prepare and Send Confirmation Email to User ---
-    const userMailSubject = `We've received your message - JK Autos`;
+    const userMailSubject = `We've received your message - JK_Autos`;
     const userMailHtml = `
       <div style="font-family: Arial, sans-serif; color: #333;">
         <h2 style="color: #0056b3;">Hello ${fullName},</h2>
