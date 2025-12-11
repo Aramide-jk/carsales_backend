@@ -38,7 +38,6 @@ const allowedOrigins = (
         process.env.FRONTEND_URL,
         process.env.FRONTEND_URL2,
         process.env.FRONTEND_URL_PRO,
-        process.env.FRONTEND_URL_CDN,
       ]
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
 ).filter((origin): origin is string => !!origin);
@@ -48,12 +47,8 @@ const app: Application = express();
 // --------------------
 // Security & Middlewares
 // --------------------
-app.use(
-  helmet({
-    contentSecurityPolicy: isProduction ? undefined : false,
-    crossOriginResourcePolicy: false,
-  })
-);
+
+console.log("allowedOrigins:", allowedOrigins);
 
 app.use(
   cors({
@@ -79,6 +74,17 @@ if (isDevelopment) {
 }
 
 app.use(express.json({ limit: "10mb" }));
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    // contentSecurityPolicy: isProduction ? undefined : false,
+    // crossOriginResourcePolicy: false,
+  })
+);
+
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
