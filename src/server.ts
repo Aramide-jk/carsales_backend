@@ -36,8 +36,9 @@ const allowedOrigins = (
   isProduction
     ? [
         process.env.FRONTEND_URL,
+        process.env.FRONTEND_URL2,
         process.env.FRONTEND_URL_PRO,
-        process.env.FRONTEND_URL_VITE,
+        process.env.FRONTEND_URL_CDN,
       ]
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
 ).filter((origin): origin is string => !!origin);
