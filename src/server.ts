@@ -56,9 +56,14 @@ const app: Application = express();
 // --------------------
 // Security & Middlewares
 // --------------------
+// app.use(
+//   helmet({
+//     contentSecurityPolicy: isProduction ? undefined : false,
+//   })
+// );
 app.use(
   helmet({
-    contentSecurityPolicy: isProduction ? undefined : false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
