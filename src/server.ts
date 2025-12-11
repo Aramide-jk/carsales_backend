@@ -43,14 +43,6 @@ const allowedOrigins = (
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
 ).filter((origin): origin is string => !!origin);
 
-// --- Startup Logs ---
-console.log("=================================");
-console.log(`NODE_ENV: ${NODE_ENV}`);
-console.log(`PORT: ${PORT}`);
-console.log(`DB_URL: ${DB_URL ? "Configured" : "MISSING"}`);
-console.log(`Allowed Origins: ${allowedOrigins.join(", ")}`);
-console.log("=================================");
-
 const app: Application = express();
 
 // --------------------
@@ -59,6 +51,7 @@ const app: Application = express();
 app.use(
   helmet({
     contentSecurityPolicy: isProduction ? undefined : false,
+    crossOriginResourcePolicy: false,
   })
 );
 
