@@ -67,6 +67,8 @@ app.use(
   })
 );
 
+app.options("*", cors());
+
 if (isDevelopment) {
   app.use(morgan("dev"));
 } else {
