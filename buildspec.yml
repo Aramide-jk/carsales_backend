@@ -1,15 +1,5 @@
 version: 0.2
 
-env:
-  variables:
-    # Set defaults if not provided
-    BASE_AMI: "ami-0b04281af4d9c36f6"  # Replace with actual AMI ID
-    SUBNET_ID: "subnet-0554549452d28c3aa"  # Replace with actual subnet ID
-    SG_ID: "sg-0aa1c28ac965807f8"  # Replace with actual SG ID
-    IAM_PROFILE: "EC2Roles"  # Replace with actual profile name
-    LAUNCH_TEMPLATE: "backend-LT"  # Replace with actual template name
-    ASG_NAME: "Backend_ASG"  # Replace with actual ASG name
-
 phases:
   install:
     runtime-versions:
@@ -27,40 +17,27 @@ phases:
       
   post_build:
     commands:
-      - echo "=== Environment Variables Check ==="
-      - echo "BASE_AMI=${BASE_AMI}"
-      - echo "SUBNET_ID=${SUBNET_ID}"
-      - echo "SG_ID=${SG_ID}"
-      - echo "IAM_PROFILE=${IAM_PROFILE}"
-      - echo "LAUNCH_TEMPLATE=${LAUNCH_TEMPLATE}"
-      - echo "ASG_NAME=${ASG_NAME}"
+      - echo "=== Starting AMI Bake Process ==="
+      - echo "BASE_AMI=$BASE_AMI"
+      - echo "SUBNET_ID=$SUBNET_ID"
+      - echo "SG_ID=$SG_ID"
       
-      - echo "=== Creating AMI Baking Script ==="
+      - echo "Verifying required environment variables..."
       - |
-        cat > bake_ami.sh << 'ENDOFSCRIPT'
-        #!/bin/bash
-        set -e
-        
-        echo "Starting backend AMI bake..."
-        
-        # Verify all required variables are set
         if [ -z "$BASE_AMI" ] || [ -z "$SUBNET_ID" ] || [ -z "$SG_ID" ]; then
           echo "ERROR: Required environment variables not set"
-          echo "BASE_AMI=$BASE_AMI"
-          echo "SUBNET_ID=$SUBNET_ID"
-          echo "SG_ID=$SG_ID"
           exit 1
         fi
-        
-        echo "All environment variables verified"
-        echo "Launching temporary EC2 instance..."
-        
+      
+      - echo "Launching temporary EC2 instance..."
+      - |
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id "$BASE_AMI" \
           --instance-type t2.micro \
           --subnet-id "$SUBNET_ID" \
           --security-group-ids "$SG_ID" \
           --iam-instance-profile Name="$IAM_PROFILE" \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=CodeBuild-Temp-Instance}]' \
           --query "Instances[0].InstanceId" \
           --output text)
         
@@ -70,26 +47,29 @@ phases:
         fi
         
         echo "Instance launched: $INSTANCE_ID"
-        
-        echo "Waiting for instance to be running..."
-        aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-        
-        echo "Waiting 60 seconds for SSM agent..."
-        sleep 60
-        
-        echo "Sending deployment commands..."
+      
+      - echo "Waiting for instance to be running..."
+      - aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+      
+      - echo "Instance is running. Waiting 60 seconds for SSM agent..."
+      - sleep 60
+      
+      - echo "Sending deployment commands via SSM..."
+      - |
         COMMAND_ID=$(aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters commands='["cd /opt/backend","unzip -o backend.zip","npm install --omit=dev","npm run build","sudo systemctl restart backend"]' \
+          --parameters 'commands=["cd /opt/backend","unzip -o backend.zip","npm install --omit=dev","npm run build","sudo systemctl restart backend"]' \
           --query "Command.CommandId" \
           --output text)
         
         echo "Command ID: $COMMAND_ID"
-        echo "Waiting for command execution..."
-        sleep 30
-        
-        echo "Creating AMI..."
+      
+      - echo "Waiting 30 seconds for command execution..."
+      - sleep 30
+      
+      - echo "Creating AMI from instance..."
+      - |
         TIMESTAMP=$(date +%s)
         AMI_ID=$(aws ec2 create-image \
           --instance-id "$INSTANCE_ID" \
@@ -99,44 +79,33 @@ phases:
           --query ImageId \
           --output text)
         
-        echo "AMI ID: $AMI_ID"
-        echo "Waiting for AMI to be available..."
-        aws ec2 wait image-available --image-ids "$AMI_ID"
-        
-        echo "Updating launch template..."
+        echo "AMI created: $AMI_ID"
+      
+      - echo "Waiting for AMI to be available..."
+      - aws ec2 wait image-available --image-ids $AMI_ID
+      
+      - echo "AMI is ready. Updating launch template..."
+      - |
         aws ec2 modify-launch-template \
           --launch-template-name "$LAUNCH_TEMPLATE" \
           --launch-template-data ImageId="$AMI_ID"
-        
-        echo "Starting instance refresh..."
+      
+      - echo "Starting Auto Scaling Group instance refresh..."
+      - |
         aws autoscaling start-instance-refresh \
           --auto-scaling-group-name "$ASG_NAME" \
           --strategy Rolling \
           --preferences MinHealthyPercentage=50
-        
-        echo "Terminating temporary instance..."
-        aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-        
-        echo "AMI bake completed successfully!"
-        echo "New AMI ID: $AMI_ID"
-        ENDOFSCRIPT
       
-      - echo "=== Script Created ==="
-      - echo "Checking if script exists..."
-      - ls -la bake_ami.sh
-      - echo "Script contents:"
-      - cat bake_ami.sh
-      - echo "Setting permissions..."
-      - chmod +x bake_ami.sh
-      - ls -la bake_ami.sh
+      - echo "Terminating temporary instance..."
+      - aws ec2 terminate-instances --instance-ids $INSTANCE_ID
       
-      - echo "=== Executing Script ==="
-      - /bin/bash -x bake_ami.sh
+      - echo "=== AMI Bake Completed Successfully ==="
+      - echo "New AMI ID: $AMI_ID"
 
 artifacts:
   files:
     - backend.zip
-    - bake_ami.sh
 
 cache:
   paths:
