@@ -29,8 +29,6 @@ phases:
       - |
         set -e
         
-      
-
         echo "Launching temporary EC2 instance..."
         
         INSTANCE_ID=$(aws ec2 run-instances \
