@@ -14,8 +14,7 @@ phases:
       - npm run build
       - zip -r backend.zip .
 
-phases:
-  build:
+  post_build:
     commands:
       - |
         echo "Build started"
