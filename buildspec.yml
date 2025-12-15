@@ -1,99 +1,57 @@
 version: 0.2
 
-env:
-  shell: bash
-
 phases:
-  install:
-    runtime-versions:
-      nodejs: 20
-    commands:
-      - echo "===== INSTALL PHASE ====="
-      - aws --version
-      - node --version
-      - npm --version
-
-  pre_build:
-    commands:
-      - echo "===== PRE-BUILD PHASE ====="
-      - echo "Git commit:"
-      - git rev-parse HEAD
-
   build:
-    commands:
-      - echo "===== BUILD PHASE ====="
-      - echo "Nothing to build locally. Build happens on bake EC2."
-
-  post_build:
     commands:
       - |
         set -e
-        
-        echo "Launching temporary EC2 instance..."
-        
+
+        echo "Starting backend AMI bake..."
+
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id "$BASE_AMI" \
           --instance-type t2.micro \
           --subnet-id "$SUBNET_ID" \
           --security-group-ids "$SG_ID" \
           --iam-instance-profile Name="$IAM_PROFILE" \
-          --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=backend-bake-$BUILD_ID}]" \
           --query "Instances[0].InstanceId" \
           --output text)
 
-        echo "Temporary instance: $INSTANCE_ID"
+        echo "Temp instance: $INSTANCE_ID"
 
-        echo "Waiting for instance to be running..."
         aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-
-       
         aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
 
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --comment "Bake backend application" \
-          --parameters 'commands=[
-            "set -e",
-            "cd /opt/backend",
-            "unzip -o backend.zip",
-            "npm install --omit=dev",
-            "npm run build",
-            "sudo systemctl restart backend"
-          ]'
+          --document-name AWS-RunShellScript \
+          --parameters commands="[
+            'cd /opt/backend',
+            'unzip -o backend.zip',
+            'npm install --omit=dev',
+            'npm run build',
+            'sudo systemctl restart backend'
+          ]"
 
-        echo "Creating AMI from baked instance..."
         AMI_ID=$(aws ec2 create-image \
           --instance-id "$INSTANCE_ID" \
-          --name "backend-ami-$BUILD_ID" \
-          --description "Backend AMI built from commit $(git rev-parse HEAD)" \
+          --name backend-ami-$(date +%s) \
           --no-reboot \
-          --query "ImageId" \
+          --query ImageId \
           --output text)
 
+        echo "AMI created: $AMI_ID"
 
         aws ec2 wait image-available --image-ids "$AMI_ID"
 
         aws ec2 modify-launch-template \
           --launch-template-name "$LAUNCH_TEMPLATE" \
           --default-version \
-          --launch-template-data ImageId="$AMI_ID" \
+          --launch-template-data ImageId="$AMI_ID"
 
-        echo "New Launch Template version: $LT_VERSION"
-
-        echo "Setting new Launch Template version as DEFAULT..."
-        aws ec2 modify-launch-template \
-          --launch-template-name "$LAUNCH_TEMPLATE" \
-          --default-version "$LT_VERSION"
-
-        echo "Starting Auto Scaling Group instance refresh..."
         aws autoscaling start-instance-refresh \
           --auto-scaling-group-name "$ASG_NAME" \
           --strategy Rolling \
           --preferences MinHealthyPercentage=50
 
-        echo "Terminating temporary bake instance..."
-        
         aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-
-        echo "===== BUILD COMPLETE SUCCESSFULLY ====="
