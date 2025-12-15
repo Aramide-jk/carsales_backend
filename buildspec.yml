@@ -4,8 +4,6 @@ phases:
   build:
     commands:
       - |
-        set -e
-
         echo "Starting backend AMI bake..."
 
         INSTANCE_ID=$(aws ec2 run-instances \
