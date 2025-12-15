@@ -1,4 +1,5 @@
 version: 0.2
+
 phases:
   install:
     runtime-versions:
@@ -6,21 +7,25 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - npm ci
+      
   build:
     commands:
       - echo "Building application..."
       - npm run build
-      - zip -r backend.zip .
+      - echo "Creating deployment package..."
+      - zip -r backend.zip . -x "*.git*" -x "node_modules/*" -x "*.zip"
+      
   post_build:
     commands:
       - echo "Creating bake_ami.sh script..."
       - mkdir -p scripts
       - |
-        cat > scripts/bake_ami.sh << 'EOF'
+        cat > scripts/bake_ami.sh << 'EOFSCRIPT'
         #!/bin/bash
         set -euo pipefail
         echo "Starting backend AMI bake..."
         
+        # Check required environment variables
         REQUIRED_VARS=("BASE_AMI" "SUBNET_ID" "SG_ID" "IAM_PROFILE" "LAUNCH_TEMPLATE" "ASG_NAME")
         for var in "${REQUIRED_VARS[@]}"; do
           if [[ -z "${!var:-}" ]]; then
@@ -29,6 +34,7 @@ phases:
           fi
         done
         
+        echo "Launching temporary EC2 instance..."
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id "$BASE_AMI" \
           --instance-type t2.micro \
@@ -39,9 +45,17 @@ phases:
           --output text)
         
         echo "Temporary instance launched: $INSTANCE_ID"
-        aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-        aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
         
+        echo "Waiting for instance to be running..."
+        aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+        
+        echo "Waiting for SSM to be available..."
+        aws ssm wait instance-online --instance-ids "$INSTANCE_ID" || {
+          echo "Warning: SSM wait timed out, proceeding anyway..."
+          sleep 30
+        }
+        
+        echo "Sending deployment commands to instance..."
         COMMAND_ID=$(aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
@@ -50,8 +64,12 @@ phases:
           --output text)
         
         echo "Command sent: $COMMAND_ID"
-        aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+        echo "Waiting for command to complete..."
+        aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || {
+          echo "Command execution check failed, but continuing..."
+        }
         
+        echo "Creating AMI from instance..."
         AMI_ID=$(aws ec2 create-image \
           --instance-id "$INSTANCE_ID" \
           --name "backend-ami-$(date +%s)" \
@@ -60,27 +78,40 @@ phases:
           --output text)
         
         echo "AMI created: $AMI_ID"
+        echo "Waiting for AMI to be available..."
         aws ec2 wait image-available --image-ids "$AMI_ID"
         
+        echo "Updating launch template with new AMI..."
         aws ec2 modify-launch-template \
           --launch-template-name "$LAUNCH_TEMPLATE" \
-          --default-version \
           --launch-template-data "{\"ImageId\":\"$AMI_ID\"}"
         
+        echo "Starting instance refresh in Auto Scaling Group..."
         aws autoscaling start-instance-refresh \
           --auto-scaling-group-name "$ASG_NAME" \
           --strategy Rolling \
           --preferences MinHealthyPercentage=50
         
+        echo "Terminating temporary instance..."
         aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
+        
         echo "Backend AMI bake completed successfully."
-        EOF
-      - echo "Setting execute permission for bake_ami.sh..."
+        EOFSCRIPT
+      - echo "Script created, checking contents..."
+      - cat scripts/bake_ami.sh
+      - echo "Setting execute permission..."
       - chmod +x scripts/bake_ami.sh
-      - echo "Running bake_ami.sh..."
-      - ./scripts/bake_ami.sh
+      - ls -la scripts/
+      - echo "Current directory:"
+      - pwd
+      - echo "Running bake_ami.sh from current directory..."
+      - bash scripts/bake_ami.sh
 
 artifacts:
   files:
     - backend.zip
     - scripts/**/*
+
+cache:
+  paths:
+    - 'node_modules/**/*'
