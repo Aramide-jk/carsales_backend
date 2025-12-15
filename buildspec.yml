@@ -21,7 +21,6 @@ phases:
       - cat > scripts/bake_ami.sh << 'EOF'
 #!/bin/bash
 set -euo pipefail
-
 echo "Starting backend AMI bake..."
 
 REQUIRED_VARS=("BASE_AMI" "SUBNET_ID" "SG_ID" "IAM_PROFILE" "LAUNCH_TEMPLATE" "ASG_NAME")
