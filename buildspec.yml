@@ -27,7 +27,7 @@ phases:
   post_build:
     commands:
       - |
-        set -euo pipefail
+        set -e
 
         echo "===== POST-BUILD (AMI BAKING) ====="
 
