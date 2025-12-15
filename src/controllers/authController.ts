@@ -57,7 +57,7 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ email });
   if (!user) {
     res.status(401);
-    throw new Error("Invalid credentials");
+    throw new Error("Invalid credentials try again!");
   }
 
   const isValid = await bcrypt.compare(password, user.password);
