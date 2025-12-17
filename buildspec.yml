@@ -1,12 +1,14 @@
 version: 0.2
 
 env:
+
   parameter-store:
     BASE_AMI: /backend/base-ami-id
     SUBNET_ID: /backend/subnet-id
     SG_ID: /backend/security-group-id
     IAM_PROFILE: /backend/iam-profile
     LAUNCH_TEMPLATE: /backend/launch-template
+
     ASG_NAME: /backend/asg-name
 
 phases:
@@ -28,6 +30,20 @@ phases:
   post_build:
     commands:
       - echo "Starting backend AMI bake process..."
+      - echo "=== DEBUG - Checking environment variables ==="
+      - echo "BASE_AMI = $BASE_AMI"
+      - echo "SUBNET_ID = $SUBNET_ID"
+      - echo "SG_ID = $SG_ID"
+      - echo "IAM_PROFILE = $IAM_PROFILE"
+      - echo "LAUNCH_TEMPLATE = $LAUNCH_TEMPLATE"
+      - echo "ASG_NAME = $ASG_NAME"
+      - echo "=== DEBUG - Verifying resources exist ==="
+      - aws ec2 describe-images --image-ids "$BASE_AMI" --query "Images[0].[ImageId,Name,State]" --output table || echo "ERROR - BASE_AMI not found or no permission"
+      - aws ec2 describe-subnets --subnet-ids "$SUBNET_ID" --query "Subnets[0].[SubnetId,VpcId,AvailabilityZone]" --output table || echo "ERROR - SUBNET_ID not found or no permission"
+      - aws ec2 describe-security-groups --group-ids "$SG_ID" --query "SecurityGroups[0].[GroupId,GroupName,VpcId]" --output table || echo "ERROR - SG_ID not found or no permission"
+      - aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE" --query "InstanceProfile.[InstanceProfileName,Arn]" --output table || echo "ERROR - IAM_PROFILE not found or no permission"
+      - echo "=== DEBUG - Attempting to launch instance ==="
+      - aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name=$IAM_PROFILE --query "Instances[0].InstanceId" --output text --dry-run || echo "Dry run to check permissions"
       - echo "Launching temporary EC2 instance..."
       - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name=$IAM_PROFILE --query "Instances[0].InstanceId" --output text)
       - echo "Temporary instance launched $INSTANCE_ID"
