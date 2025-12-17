@@ -1,86 +1,70 @@
 version: 0.2
+
 phases:
   install:
     runtime-versions:
       nodejs: 20
     commands:
-      - echo "Installing dependencies..."
+      - echo "Installing dependencies"
       - npm ci
+
   build:
     commands:
-      - echo "Building application..."
+      - echo "Building backend"
       - npm run build
       - zip -r backend.zip .
+
   post_build:
     commands:
-      - echo "Creating bake_ami.sh script..."
-      - mkdir -p scripts
-      - |
-        cat > scripts/bake_ami.sh << 'EOF'
-        #!/bin/bash
-        set -euo pipefail
-        echo "Starting backend AMI bake..."
-        
-        REQUIRED_VARS=("BASE_AMI" "SUBNET_ID" "SG_ID" "IAM_PROFILE" "LAUNCH_TEMPLATE" "ASG_NAME")
-        for var in "${REQUIRED_VARS[@]}"; do
-          if [[ -z "${!var:-}" ]]; then
-            echo "ERROR: Environment variable '$var' is not defined."
-            exit 1
-          fi
-        done
-        
-        INSTANCE_ID=$(aws ec2 run-instances \
+      - echo "Starting AMI bake"
+      - aws ec2 run-instances \
           --image-id "$BASE_AMI" \
           --instance-type t2.micro \
           --subnet-id "$SUBNET_ID" \
           --security-group-ids "$SG_ID" \
           --iam-instance-profile Name="$IAM_PROFILE" \
           --query "Instances[0].InstanceId" \
-          --output text)
-        
-        echo "Temporary instance launched: $INSTANCE_ID"
-        aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-        aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
-        
-        COMMAND_ID=$(aws ssm send-command \
+          --output text > instance_id.txt
+
+      - INSTANCE_ID=$(cat instance_id.txt)
+      - echo "Instance ID: $INSTANCE_ID"
+
+      - aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+      - aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
+
+      - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters '{"commands":["cd /opt/backend","unzip -o backend.zip","npm install --omit=dev","npm run build","sudo systemctl restart backend"]}' \
-          --query "Command.CommandId" \
-          --output text)
-        
-        echo "Command sent: $COMMAND_ID"
-        aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
-        
-        AMI_ID=$(aws ec2 create-image \
+          --document-name AWS-RunShellScript \
+          --parameters commands="[
+            'cd /opt/backend',
+            'rm -rf *',
+            'aws s3 cp s3://your-artifact-bucket/backend.zip .',
+            'unzip backend.zip',
+            'npm install --omit=dev',
+            'npm run build',
+            'sudo systemctl restart backend'
+          ]"
+
+      - aws ec2 create-image \
           --instance-id "$INSTANCE_ID" \
-          --name "backend-ami-$(date +%s)" \
+          --name backend-ami-$(date +%s) \
           --no-reboot \
           --query ImageId \
-          --output text)
-        
-        echo "AMI created: $AMI_ID"
-        aws ec2 wait image-available --image-ids "$AMI_ID"
-        
-        aws ec2 modify-launch-template \
+          --output text > ami_id.txt
+
+      - AMI_ID=$(cat ami_id.txt)
+      - echo "New AMI: $AMI_ID"
+
+      - aws ec2 wait image-available --image-ids "$AMI_ID"
+
+      - aws ec2 modify-launch-template \
           --launch-template-name "$LAUNCH_TEMPLATE" \
           --default-version \
-          --launch-template-data "{\"ImageId\":\"$AMI_ID\"}"
-        
-        aws autoscaling start-instance-refresh \
+          --launch-template-data ImageId="$AMI_ID"
+
+      - aws autoscaling start-instance-refresh \
           --auto-scaling-group-name "$ASG_NAME" \
           --strategy Rolling \
           --preferences MinHealthyPercentage=50
-        
-        aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-        echo "Backend AMI bake completed successfully."
-        EOF
-      - echo "Setting execute permission for bake_ami.sh..."
-      - chmod +x scripts/bake_ami.sh
-      - echo "Running bake_ami.sh..."
-      - ./scripts/bake_ami.sh
 
-artifacts:
-  files:
-    - backend.zip
-    - scripts/**/*
+      - aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
