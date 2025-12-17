@@ -1,14 +1,5 @@
 version: 0.2
 
-env:
-  parameter-store:
-    BASE_AMI: /backend/base-ami-id
-    SUBNET_ID: /backend/subnet-id
-    SG_ID: /backend/security-group-id
-    IAM_PROFILE: /backend/iam-profile
-    LAUNCH_TEMPLATE: /backend/launch-template
-    ASG_NAME: /backend/asg-name
-    
 phases:
   install:
     runtime-versions:
@@ -16,6 +7,7 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - npm ci
+      
   build:
     commands:
       - echo "Building backend application..."
@@ -23,25 +15,99 @@ phases:
       - zip -r backend.zip .
       - echo "Uploading backend.zip to S3..."
       - aws s3 cp backend.zip s3://backend-artifacts-2025/backend.zip
+      
   post_build:
     commands:
-      - echo "Starting backend AMI bake..."
+      - echo "Starting backend AMI bake process..."
+      
+      # Launch temporary EC2 instance
       - echo "Launching temporary EC2 instance..."
-      - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --query "Instances[0].InstanceId" --output text)
+      - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name=$IAM_PROFILE --query "Instances[0].InstanceId" --output text)
       - echo "Temporary instance launched $INSTANCE_ID"
-      - echo "Waiting for instance to be ready..."
+      
+      # Wait for instance to be running
+      - echo "Waiting for instance to be running..."
       - aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-      - aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
-      - echo "Deploying backend via SSM..."
-      - aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --parameters commands="['cd /opt/backend','rm -rf *','aws s3 cp s3://backend-artifacts-2025/backend.zip .','unzip backend.zip','npm install --omit=dev','npm run build','sudo systemctl restart backend']"
-      - echo "Creating new AMI..."
+      - echo "Instance is running"
+      
+      # Wait for SSM agent to come online with robust checking
+      - echo "Waiting for SSM agent to be online..."
+      - |
+        for i in {1..60}; do
+          STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query "InstanceInformationList[0].PingStatus" \
+            --output text 2>/dev/null || echo "NotFound")
+          echo "Attempt $i/60 - SSM Status: $STATUS"
+          if [ "$STATUS" = "Online" ]; then
+            echo "SSM agent is online!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "ERROR: SSM agent did not come online after 10 minutes"
+            echo "Checking instance details for debugging..."
+            aws ec2 describe-instances --instance-ids "$INSTANCE_ID"
+            aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" || echo "Instance not registered with SSM"
+            exit 1
+          fi
+          sleep 10
+        done
+      
+      # Deploy backend via SSM
+      - echo "Deploying backend application via SSM..."
+      - |
+        COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters 'commands=["cd /opt/backend","rm -rf *","aws s3 cp s3://backend-artifacts-2025/backend.zip .","unzip backend.zip","npm install --omit=dev","npm run build","sudo systemctl restart backend"]' \
+          --query "Command.CommandId" \
+          --output text)
+      - echo "SSM command sent with ID $COMMAND_ID"
+      
+      # Wait for SSM command to complete
+      - echo "Waiting for deployment command to complete..."
+      - aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+      - echo "Deployment completed successfully"
+      
+      # Verify command execution status
+      - |
+        COMMAND_STATUS=$(aws ssm get-command-invocation \
+          --command-id "$COMMAND_ID" \
+          --instance-id "$INSTANCE_ID" \
+          --query "Status" \
+          --output text)
+        echo "Command execution status: $COMMAND_STATUS"
+        if [ "$COMMAND_STATUS" != "Success" ]; then
+          echo "ERROR: SSM command failed"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          exit 1
+        fi
+      
+      # Create new AMI
+      - echo "Creating new AMI from configured instance..."
       - AMI_ID=$(aws ec2 create-image --instance-id "$INSTANCE_ID" --name "backend-ami-$(date +%s)" --no-reboot --query ImageId --output text)
-      - echo "New AMI created $AMI_ID"
+      - echo "New AMI created with ID $AMI_ID"
+      - echo "Waiting for AMI to be available..."
       - aws ec2 wait image-available --image-ids "$AMI_ID"
-      - echo "Updating Launch Template..."
-      - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version --launch-template-data ImageId="$AMI_ID"
-      - echo "Triggering ASG rolling refresh..."
+      - echo "AMI is now available"
+      
+      # Update Launch Template with new AMI
+      - echo "Updating Launch Template to use new AMI..."
+      - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version --launch-template-data "{\"ImageId\":\"$AMI_ID\"}"
+      - echo "Launch Template updated successfully"
+      
+      # Trigger ASG instance refresh
+      - echo "Triggering Auto Scaling Group instance refresh..."
       - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50
+      - echo "Instance refresh started"
+      
+      # Cleanup temporary instance
       - echo "Terminating temporary instance..."
       - aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-      - echo "Backend AMI bake and ASG refresh completed successfully."
+      - echo "Temporary instance terminated"
+      
+      - echo "==================================="
+      - echo "Backend AMI bake completed successfully!"
+      - echo "New AMI ID: $AMI_ID"
+      - echo "ASG will gradually roll out new instances"
+      - echo "==================================="
