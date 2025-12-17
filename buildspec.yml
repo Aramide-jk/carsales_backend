@@ -68,7 +68,11 @@ phases:
       - aws ec2 wait image-available --image-ids "$AMI_ID"
       - echo "AMI is now available"
       - echo "Updating Launch Template to use new AMI..."
-      - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version --launch-template-data "{\"ImageId\":\"$AMI_ID\"}"
+      - echo "Creating new launch template version..."
+      - NEW_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" --query 'LaunchTemplateVersion.VersionNumber' --output text)
+      - echo "New launch template version $NEW_VERSION created"
+      - echo "Setting new launch template version as default..."
+      - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version "$NEW_VERSION"
       - echo "Launch Template updated successfully"
       - echo "Triggering Auto Scaling Group instance refresh..."
       - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50
