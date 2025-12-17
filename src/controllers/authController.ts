@@ -62,13 +62,10 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const isValid = await bcrypt.compare(password, user.password);
 
-  if (isValid) alert("This works");
-  else alert("This doesn't work");
-
-  // if (!isValid) {
-  //   res.status(401);
-  //   throw new Error("Invalid credentials try again!");
-  // }
+  if (!isValid) {
+    res.status(401);
+    throw new Error("Invalid credentials try again!");
+  }
 
   const token = generateToken(user.id, user.role);
 
