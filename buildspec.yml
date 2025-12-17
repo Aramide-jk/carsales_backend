@@ -1,5 +1,14 @@
 version: 0.2
 
+env:
+  parameter-store:
+    BASE_AMI: /backend/base-ami-id
+    SUBNET_ID: /backend/subnet-id
+    SG_ID: /backend/security-group-id
+    IAM_PROFILE: /backend/iam-profile
+    LAUNCH_TEMPLATE: /backend/launch-template
+    ASG_NAME: /backend/asg-name
+
 phases:
   install:
     runtime-versions:
