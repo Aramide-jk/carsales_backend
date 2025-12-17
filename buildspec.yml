@@ -17,7 +17,7 @@ phases:
     commands:
       - echo "Starting backend AMI bake..."
       - echo "Launching temporary EC2 instance..."
-      - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name="$IAM_PROFILE" --query "Instances[0].InstanceId" --output text)
+      - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --query "Instances[0].InstanceId" --output text)
       - echo "Temporary instance launched $INSTANCE_ID"
       - echo "Waiting for instance to be ready..."
       - aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
