@@ -19,30 +19,23 @@ phases:
       
   build:
     commands:
-      - echo "Building backend application with TypeScript..."
+      - echo "Building backend application..."
       - npm run build
-      - echo "Removing dev dependencies and keeping only production deps..."
+      - echo "Installing production dependencies..."
       - rm -rf node_modules
       - npm ci --omit=dev
-      - echo "Verifying built files exist..."
-      - ls -la dist/
-      - echo "Verifying package.json is valid..."
-      - cat package.json | jq . > /dev/null && echo "package.json is valid JSON"
+      - echo "Verifying package.json before zipping..."
+      - cat package.json
+      - wc -c package.json
       - echo "Creating deployment package..."
-      - mkdir -p deploy
-      - cp -r dist deploy/
-      - cp -r node_modules deploy/
-      - cp package.json deploy/
-      - cp package-lock.json deploy/
-      - cd deploy
-      - ls -la
-      - echo "Zipping deployment package..."
-      - zip -r ../backend.zip .
-      - cd ..
-      - echo "Verifying zip file..."
-      - unzip -l backend.zip | head -20
-      - echo "Uploading backend.zip to S3..."
+      - zip -r backend.zip dist/ node_modules/ package.json package-lock.json
+      - echo "Verifying zip contents..."
+      - unzip -l backend.zip | grep package.json
+      - unzip -p backend.zip package.json | head -20
+      - echo "Uploading to S3..."
       - aws s3 cp backend.zip s3://backend-artifacts-2025/backend.zip
+      - echo "Verifying S3 upload..."
+      - aws s3 ls s3://backend-artifacts-2025/backend.zip --human-readable
       
   post_build:
     commands:
@@ -50,45 +43,35 @@ phases:
       - echo "Launching temporary EC2 instance..."
       - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t2.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name=$IAM_PROFILE --query "Instances[0].InstanceId" --output text)
       - echo "Temporary instance launched $INSTANCE_ID"
-      - echo "Waiting for instance to be running..."
       - aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-      - echo "Instance is running"
-      - echo "Waiting for SSM agent to be online (this may take 2-3 minutes)..."
+      - echo "Waiting for SSM agent..."
       - sleep 30
-      - for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --query "InstanceInformationList[0].PingStatus" --output text 2>/dev/null || echo "NotFound"); echo "Attempt $i/30 - SSM Status $STATUS"; if [ "$STATUS" = "Online" ]; then echo "SSM agent is online!"; break; fi; if [ $i -eq 30 ]; then echo "ERROR SSM agent did not come online"; aws ec2 describe-instances --instance-ids "$INSTANCE_ID"; exit 1; fi; sleep 10; done
-      - echo "Deploying pre-built backend application via SSM..."
-      - COMMAND_ID=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --parameters 'commands=["cd /opt/backend","rm -rf *","aws s3 cp s3://backend-artifacts-2025/backend.zip .","unzip -o backend.zip","echo \"=== Verifying extracted files ===\"","ls -la","echo \"=== Checking package.json ===\"","cat package.json | head -5","echo \"=== Checking dist directory ===\"","ls -la dist/","echo \"=== Starting backend service ===\"","sudo systemctl daemon-reload","sudo systemctl enable backend","sudo systemctl restart backend","sleep 10","sudo systemctl status backend --no-pager -l","echo \"=== Testing local connection ===\"","curl -f http://localhost:8000/ || curl -f http://localhost:8000/ || echo \"Service not responding on port 8000\""]' --query "Command.CommandId" --output text)
-      - echo "SSM command sent with ID $COMMAND_ID"
-      - echo "Waiting for deployment command to complete..."
-      - aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
-      - echo "Getting SSM command output..."
-      - aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "[Status,StandardOutputContent,StandardErrorContent]" --output text
+      - for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --query "InstanceInformationList[0].PingStatus" --output text 2>/dev/null || echo "NotFound"); echo "Attempt $i/30 - SSM Status $STATUS"; if [ "$STATUS" = "Online" ]; then echo "SSM agent is online!"; break; fi; if [ $i -eq 30 ]; then echo "ERROR SSM agent did not come online"; exit 1; fi; sleep 10; done
+      - echo "Deploying backend via SSM..."
+      - COMMAND_ID=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --parameters 'commands=["#!/bin/bash","set -ex","echo \"Stopping backend service\"","sudo systemctl stop backend || true","echo \"Creating temp directory\"","mkdir -p /tmp/backend-deploy","cd /tmp/backend-deploy","echo \"Downloading from S3\"","aws s3 cp s3://backend-artifacts-2025/backend.zip . || exit 1","echo \"Verifying download\"","ls -lh backend.zip","file backend.zip","echo \"Extracting files\"","unzip -o backend.zip || exit 1","echo \"Verifying extracted files\"","ls -la","echo \"Checking package.json\"","cat package.json | head -5 || exit 1","test -s package.json || (echo \"ERROR: package.json is empty\" && exit 1)","echo \"Clearing /opt/backend\"","sudo rm -rf /opt/backend/*","echo \"Moving files to /opt/backend\"","sudo cp -r * /opt/backend/","cd /opt/backend","echo \"Final verification\"","ls -la","cat package.json | jq . || exit 1","echo \"Starting service\"","sudo systemctl daemon-reload","sudo systemctl enable backend","sudo systemctl start backend","sleep 10","sudo systemctl status backend --no-pager","echo \"Testing service\"","curl -f http://localhost:8000/ || curl -f http://localhost:8000/ || echo \"Warning: service not responding\"","echo \"Cleanup\"","rm -rf /tmp/backend-deploy"]' --query "Command.CommandId" --output text)
+      - echo "SSM command ID $COMMAND_ID"
+      - aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
+      - echo "=== SSM Command Output ==="
+      - aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "StandardOutputContent" --output text
+      - echo "=== SSM Command Errors ==="
+      - aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text
       - COMMAND_STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "Status" --output text)
-      - echo "Command execution status $COMMAND_STATUS"
-      - if [ "$COMMAND_STATUS" != "Success" ]; then echo "ERROR SSM command failed"; aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"; exit 1; fi
-      - echo "Creating new AMI from configured instance..."
+      - echo "Command status $COMMAND_STATUS"
+      - if [ "$COMMAND_STATUS" != "Success" ]; then echo "ERROR: Deployment failed"; exit 1; fi
+      - echo "Creating AMI..."
       - AMI_ID=$(aws ec2 create-image --instance-id "$INSTANCE_ID" --name "backend-ami-$(date +%s)" --no-reboot --query ImageId --output text)
-      - echo "New AMI created with ID $AMI_ID"
-      - echo "Waiting for AMI to be available..."
+      - echo "AMI created $AMI_ID"
       - aws ec2 wait image-available --image-ids "$AMI_ID"
-      - echo "AMI is now available"
-      - echo "Creating new launch template version..."
+      - echo "Updating Launch Template..."
       - NEW_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" --query 'LaunchTemplateVersion.VersionNumber' --output text)
-      - echo "New launch template version $NEW_VERSION created"
-      - echo "Setting new launch template version as default..."
       - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version "$NEW_VERSION"
-      - echo "Launch Template updated successfully"
-      - echo "Setting ASG health check grace period to 300 seconds..."
+      - echo "Updating ASG..."
       - aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG_NAME" --health-check-grace-period 300
-      - echo "Triggering Auto Scaling Group instance refresh..."
       - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50,InstanceWarmup=120
-      - echo "Instance refresh started"
-      - echo "Terminating temporary instance..."
+      - echo "Terminating temp instance..."
       - aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-      - echo "Temporary instance terminated"
       - echo "==================================="
-      - echo "Backend AMI bake completed successfully!"
-      - echo "New AMI ID $AMI_ID"
-      - echo "New Launch Template Version $NEW_VERSION"
-      - echo "ASG will gradually roll out new instances"
+      - echo "SUCCESS!"
+      - echo "AMI: $AMI_ID"
+      - echo "Launch Template Version: $NEW_VERSION"
       - echo "==================================="
