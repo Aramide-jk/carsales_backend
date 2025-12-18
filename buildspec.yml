@@ -21,81 +21,38 @@ phases:
     commands:
       - echo "Building backend"
       - npm run build
-
       - echo "Installing production dependencies"
       - rm -rf node_modules
       - npm ci --omit=dev
-
-      - echo "Validating build output"
       - test -d dist
       - test -s package.json
       - node -e "JSON.parse(require('fs').readFileSync('package.json'))"
-
-      - echo "Creating immutable deployment bundle"
       - mkdir deploy
       - cp -r dist node_modules package.json package-lock.json deploy/
-
-      - cd deploy
-      - zip -r backend.zip .
-      - cd ..
-
-      - echo "Uploading artifact to S3"
+      - cd deploy && zip -r backend.zip . && cd ..
       - aws s3 cp deploy/backend.zip s3://backend-artifacts-2025/backend.zip
 
   post_build:
     commands:
-      - echo "Launching temporary EC2 instance for AMI bake"
+      - echo "Launching temporary EC2 instance"
       - INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type t3.micro --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name="$IAM_PROFILE" --query "Instances[0].InstanceId" --output text)
-
       - aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-
-      - echo "Waiting for SSM"
       - aws ssm wait instance-online --instance-ids "$INSTANCE_ID"
 
-      - echo "Deploying application onto bake instance"
-      - aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name AWS-RunShellScript \
-          --parameters 'commands=[
-            "set -e",
-            "mkdir -p /tmp/backend",
-            "cd /tmp/backend",
-            "aws s3 cp s3://backend-artifacts-2025/backend.zip .",
-            "unzip -o backend.zip",
+      - echo "Deploying application to bake instance"
+      - aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --parameters 'commands=["set -e","mkdir -p /tmp/backend","cd /tmp/backend","aws s3 cp s3://backend-artifacts-2025/backend.zip .","unzip -o backend.zip","systemctl stop backend || true","rm -rf /opt/backend.bak","mv /opt/backend /opt/backend.bak || true","mkdir -p /opt/backend","cp -r * /opt/backend/","chown -R ec2-user:ec2-user /opt/backend","chmod -R 755 /opt/backend","systemctl daemon-reexec","systemctl start backend","sleep 10","curl -f http://localhost:8000/ || curl -f http://localhost:8000/"]'
 
-            "systemctl stop backend || true",
-
-            "rm -rf /opt/backend.bak",
-            "mv /opt/backend /opt/backend.bak || true",
-            "mkdir -p /opt/backend",
-            "cp -r * /opt/backend/",
-
-            "chown -R ec2-user:ec2-user /opt/backend",
-            "chmod -R 755 /opt/backend",
-
-            "systemctl daemon-reexec",
-            "systemctl start backend",
-            "sleep 10",
-            "curl -f http://localhost:8000/ || curl -f http://localhost:8000/"
-          ]'
-
-      - echo "Creating new AMI"
+      - echo "Creating AMI"
       - AMI_ID=$(aws ec2 create-image --instance-id "$INSTANCE_ID" --name "backend-ami-$(date +%s)" --no-reboot --query ImageId --output text)
-
       - aws ec2 wait image-available --image-ids "$AMI_ID"
 
       - echo "Updating launch template"
-      - NEW_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" --query 'LaunchTemplateVersion.VersionNumber' --output text)
-
+      - NEW_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data "{\"ImageId\":\"$AMI_ID\"}" --query "LaunchTemplateVersion.VersionNumber" --output text)
       - aws ec2 modify-launch-template --launch-template-name "$LAUNCH_TEMPLATE" --default-version "$NEW_VERSION"
 
-      - echo "Updating ASG and starting instance refresh"
+      - echo "Updating ASG"
       - aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG_NAME" --health-check-grace-period 300
       - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50,InstanceWarmup=120
 
-      - echo "Cleaning up bake instance"
       - aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
-
-      - echo "SUCCESS"
-      - echo "AMI: $AMI_ID"
-      - echo "Launch template version: $NEW_VERSION"
+      - echo "SUCCESS — AMI $AMI_ID, LT version $NEW_VERSION"
