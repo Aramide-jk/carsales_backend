@@ -77,7 +77,7 @@ phases:
       - echo "Setting ASG health check grace period..."
       - aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG_NAME" --health-check-grace-period 180
       - echo "Triggering Auto Scaling Group instance refresh..."
-      - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50
+      - aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences MinHealthyPercentage=50,InstanceWarmup=120
       - echo "Instance refresh started"
       - echo "Terminating temporary instance..."
       - aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
