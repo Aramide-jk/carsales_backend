@@ -9,6 +9,9 @@
     "build": "rm -rf dist && tsc",
     "start": "node dist/server.js"
   },
+  "files.associations": {
+    ".env.*": "dotenv"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
