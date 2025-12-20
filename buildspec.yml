@@ -34,9 +34,8 @@ phases:
       - aws s3 cp ${ARTIFACT_NAME} s3://${ARTIFACT_BUCKET}/${ARTIFACT_NAME}
 
       - echo "Triggering EC2 Image Builder pipeline..."
-      - aws imagebuilder start-image-pipeline-execution \
-          --image-pipeline-arn ${IMAGE_PIPELINE_ARN}
-
+      - aws imagebuilder start-image-pipeline-execution --image-pipeline-arn ${IMAGE_PIPELINE_ARN}
+          
 artifacts:
   files:
     - '**/*'
