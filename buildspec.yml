@@ -4,7 +4,7 @@ env:
   variables:
     APP_NAME: backend-app
     ARTIFACT_BUCKET: my-backend-artifacts-123
-    IMAGE_PIPELINE_ARN: arn:aws:imagebuilder:us-east-1:734649603753:image-pipeline/NodeBackendPipeline
+    IMAGE_PIPELINE_ARN: arn:aws:imagebuilder:us-east-1:734649603753:image-pipeline/nodeBackendPipeline
 
 phases:
   install:
@@ -24,11 +24,9 @@ phases:
       - echo "Packaging build artifact..."
       - mkdir -p artifact
       - cp -r dist package.json package-lock.json ecosystem.config.js artifact/
-
       - cd artifact
       - ARTIFACT_VERSION=${CODEBUILD_BUILD_NUMBER}
       - ARTIFACT_NAME=${APP_NAME}-${ARTIFACT_VERSION}.tar.gz
-
       - tar -czf ${ARTIFACT_NAME} *
       - echo "Uploading artifact to S3..."
       - aws s3 cp ${ARTIFACT_NAME} s3://${ARTIFACT_BUCKET}/${ARTIFACT_NAME}
