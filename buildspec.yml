@@ -10,7 +10,9 @@ phases:
     commands:
       - npm test || true
       - npm run build || true
-      - tar -czf backend-app.tar.gz .
+      - mkdir -p artifact
+      - rsync -av --exclude=node_modules --exclude=artifact . artifact/
+      - tar -czf backend-app.tar.gz -C artifact .
 artifacts:
   files:
     - backend-app.tar.gz
