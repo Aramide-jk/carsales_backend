@@ -1,5 +1,11 @@
 version: 0.2
 
+env:
+  variables:
+    APP_NAME: backend-app
+    ARTIFACT_BUCKET: my-backend-artifacts-123
+    IMAGE_PIPELINE_ARN: arn:aws:imagebuilder:us-east-1:734649603753:image-pipeline/NodeBackendPipeline
+
 phases:
   install:
     runtime-versions:
@@ -7,15 +13,31 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - npm ci
+
   build:
     commands:
-      - echo "Building app..."
+      - echo "Building Node.js application..."
       - npm run build
+
   post_build:
     commands:
-      - echo "Packaging artifact..."
+      - echo "Packaging build artifact..."
       - mkdir -p artifact
       - cp -r dist package.json package-lock.json ecosystem.config.js artifact/
+
       - cd artifact
-      - tar -czf backend-app-1.0.0.tar.gz *
-      - aws s3 cp backend-app-1.0.0.tar.gz s3://my-backend-artifacts-123/backend-app-1.0.0.tar.gz
+      - ARTIFACT_VERSION=${CODEBUILD_BUILD_NUMBER}
+      - ARTIFACT_NAME=${APP_NAME}-${ARTIFACT_VERSION}.tar.gz
+
+      - tar -czf ${ARTIFACT_NAME} *
+      - echo "Uploading artifact to S3..."
+      - aws s3 cp ${ARTIFACT_NAME} s3://${ARTIFACT_BUCKET}/${ARTIFACT_NAME}
+
+      - echo "Triggering EC2 Image Builder pipeline..."
+      - aws imagebuilder start-image-pipeline-execution \
+          --image-pipeline-arn ${IMAGE_PIPELINE_ARN}
+
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: yes
