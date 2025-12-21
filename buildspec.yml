@@ -13,6 +13,10 @@ phases:
       - mkdir -p artifact
       - rsync -av --exclude=node_modules --exclude=artifact . artifact/
       - tar -czf backend-app.tar.gz -C artifact .
+  post_build:
+    commands:
+      - aws s3 cp backend-app.tar.gz s3://my-backend-artifacts-123/backend/backend-app.tar.gz
+
 artifacts:
   files:
     - backend-app.tar.gz
