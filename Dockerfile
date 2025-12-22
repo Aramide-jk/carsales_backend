@@ -6,31 +6,33 @@ FROM node:20-alpine AS build
 # Set working directory
 WORKDIR /app
 
-# Install all dependencies (including dev for build)
+# Install build dependencies (all, including dev)
 COPY package*.json ./
 RUN npm ci
 
-# Copy source code and build
+# Copy source code
 COPY . .
+
+# Build project
 RUN npm run build
 
 # ==========================
 # Stage 2: Production Stage
 # ==========================
-FROM node:20-alpine
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install only production dependencies
+# Install only production dependencies with caching for faster rebuilds
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy built files from build stage
+# Copy compiled files from build stage
 COPY --from=build /app/dist ./dist
 
 # Set environment
 ENV NODE_ENV=production
 EXPOSE 8000
 
-# Start the app
+# Run the app
 CMD ["node", "dist/server.js"]
