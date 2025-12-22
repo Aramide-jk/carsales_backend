@@ -17,6 +17,5 @@ ENV NODE_ENV=production
 EXPOSE 8000
 
 # Only run runtime dependencies in production
-RUN npm prune --production
 
 CMD ["node", "dist/server.js"]
