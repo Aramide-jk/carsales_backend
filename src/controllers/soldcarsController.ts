@@ -8,6 +8,7 @@ export const getSoldCars = async (req: Request, res: Response) => {
       success: true,
       count: cars.length,
       data: cars,
+      message: "Sold cars fetched successfully",
     });
     console.log("Sold cars fetched successfully");
   } catch (error) {
