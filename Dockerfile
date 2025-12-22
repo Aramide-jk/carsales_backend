@@ -10,4 +10,4 @@ COPY . .
 ENV NODE_ENV=production
 EXPOSE 8000
 
-CMD ["node", "server.js"]
+CMD ["node", "dist/server.js"]
