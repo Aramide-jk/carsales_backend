@@ -57,7 +57,7 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ email });
   if (!user) {
     res.status(401);
-    throw new Error("Invalid credentials try again!");
+    throw new Error("Invalid credentials try again! User not found");
   }
 
   const isValid = await bcrypt.compare(password, user.password);
@@ -69,24 +69,28 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const token = generateToken(user.id, user.role);
 
-  res.status(200).json({ user, token });
+  // IMPORTANT: Do not send the whole user object, it contains the password hash.
+  // Send a curated object instead, similar to the registerUser response.
+  res.status(200).json({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    token,
+  });
 });
 
-export const getProfile = async (req: Request, res: Response) => {
-  try {
-    // assuming you use JWT middleware and put `req.user.id`
-    const user = await User.findById((req as any).user.id).select("-password");
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
-    res.json({ success: true, data: user });
-  } catch (error) {
-    console.error("Profile fetch error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+export const getProfile = asyncHandler(async (req: Request, res: Response) => {
+  // The `req.user` property is typically added by an authentication middleware
+  // after verifying the JWT token.
+  const user = await User.findById((req as any).user.id).select("-password");
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
   }
-};
+  res.status(200).json(user);
+});
 
 // Logout User
 export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
@@ -94,7 +98,7 @@ export const logoutUser = asyncHandler(async (req: Request, res: Response) => {
     httpOnly: true,
     expires: new Date(0),
   });
-  res.status(200).json({ message: "Logged out successfully" });
+  res.status(200).json({ message: "User logged out successfully" });
 });
 
 export const adminLogin = asyncHandler(async (req: Request, res: Response) => {
@@ -113,14 +117,6 @@ export const adminLogin = asyncHandler(async (req: Request, res: Response) => {
     res.status(401);
     throw new Error("Invalid admin credentials");
   }
-});
-
-export const adminLogout = asyncHandler(async (req: Request, res: Response) => {
-  res.cookie("token", "", {
-    httpOnly: true,
-    expires: new Date(0),
-  });
-  res.status(200).json({ message: "Admin logged out successfully" });
 });
 
 export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
