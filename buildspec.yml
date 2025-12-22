@@ -27,14 +27,10 @@ phases:
       - echo "=== DEPLOYMENT STARTED ==="
       - echo "Environment: ${ENVIRONMENT}"
       - echo "Git Commit: ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-      
-      # Set variables
       - BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
       - AMI_NAME="backend-${ENVIRONMENT}-${BUILD_TIMESTAMP}"
       - INSTANCE_TYPE="t3.micro"
       - export DEPLOYMENT_ID="deploy-${BUILD_TIMESTAMP}"
-      
-      # Validate parameters
       - |
         for param in BASE_AMI SUBNET_ID SG_ID IAM_PROFILE LAUNCH_TEMPLATE ASG_NAME; do
           if [ -z "${!param}" ]; then
@@ -45,86 +41,40 @@ phases:
 
   build:
     commands:
-      - echo "=== STEP 1: Launching build instance ==="
       - |
+        echo "=== STEP 1: Launching build instance ==="
         set -e
-        INSTANCE_ID=$(aws ec2 run-instances \
-          --image-id "$BASE_AMI" \
-          --instance-type "$INSTANCE_TYPE" \
-          --subnet-id "$SUBNET_ID" \
-          --security-group-ids "$SG_ID" \
-          --iam-instance-profile Name="$IAM_PROFILE" \
-          --tag-specifications "
-            ResourceType=instance,
-            Tags=[
-              {Key=Name,Value=backend-build-${BUILD_TIMESTAMP}},
-              {Key=Environment,Value=${ENVIRONMENT}},
-              {Key=DeploymentID,Value=${DEPLOYMENT_ID}},
-              {Key=Commit,Value=${CODEBUILD_RESOLVED_SOURCE_VERSION}}
-            ]" \
-          --block-device-mappings "
-            DeviceName=/dev/xvda,
-            Ebs={
-              VolumeSize=20,
-              VolumeType=gp3,
-              DeleteOnTermination=true
-            }" \
-          --query 'Instances[0].InstanceId' \
-          --output text)
-        
+        INSTANCE_TAGS='ResourceType=instance,Tags=[{Key=Name,Value=backend-build-'"${BUILD_TIMESTAMP}"'},{Key=Environment,Value='"${ENVIRONMENT}"'},{Key=DeploymentID,Value='"${DEPLOYMENT_ID}"'},{Key=Commit,Value='"${CODEBUILD_RESOLVED_SOURCE_VERSION}"'}]'
+        INSTANCE_ID=$(aws ec2 run-instances --image-id "$BASE_AMI" --instance-type "$INSTANCE_TYPE" --subnet-id "$SUBNET_ID" --security-group-ids "$SG_ID" --iam-instance-profile Name="$IAM_PROFILE" --tag-specifications "$INSTANCE_TAGS" --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' --query 'Instances[0].InstanceId' --output text)
         echo "Instance created: $INSTANCE_ID"
         echo $INSTANCE_ID > instance_id.txt
-
-      - echo "Waiting for instance to be ready (SSM agent running)..."
       - |
+        echo "Waiting for instance to be ready (SSM agent running)..."
         for i in {1..30}; do
-          if aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-            --query "InstanceInformationList[0].PingStatus" \
-            --output text | grep -q "Online"; then
+          if aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --query "InstanceInformationList[0].PingStatus" --output text | grep -q "Online"; then
             echo "Instance is online and ready for SSM commands"
             break
           fi
           echo "Waiting for SSM agent... ($i/30)"
           sleep 10
-          
           if [ $i -eq 30 ]; then
             echo "ERROR: SSM agent did not come online in time"
             exit 1
           fi
         done
-
-      - echo "=== STEP 2: Deploying code via SSM ==="
       - |
-        # Create deployment script
+        echo "=== STEP 2: Deploying code via SSM ==="
         cat > /tmp/deploy.sh << 'EOF'
         #!/bin/bash
         set -e
-        
         echo "Starting deployment..."
         echo "Git commit: $COMMIT_HASH"
-        
-        # Ensure we're in the right directory
         cd /opt/backend
-        
-        # Pull latest code
         git fetch origin
         git checkout -f $COMMIT_HASH
-        
-        # Install dependencies
         npm ci --only=production
-        
-        # Run database migrations (if any)
-        # npx sequelize db:migrate
-        
-        # Run tests
-        # npm test
-        
-        # Restart application
         systemctl daemon-reload
         systemctl restart backend
-        
-        # Verify service is running
         sleep 5
         if systemctl is-active --quiet backend; then
           echo "✅ Service is running"
@@ -135,50 +85,21 @@ phases:
           exit 1
         fi
         EOF
-        
-        # Upload and execute script
-        DEPLOY_COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --comment "Deploy backend ${DEPLOYMENT_ID}" \
-          --parameters '{
-            "commands": ["cat > /tmp/deploy.sh", "chmod +x /tmp/deploy.sh", "/tmp/deploy.sh"],
-            "env": [{"name": "COMMIT_HASH", "value": "'"${CODEBUILD_RESOLVED_SOURCE_VERSION}"'"}]
-          }' \
-          --cloud-watch-output-config 'CloudWatchLogGroupName=/backend/deployments,CloudWatchOutputEnabled=true' \
-          --query "Command.CommandId" \
-          --output text)
-        
+        DEPLOY_COMMAND_ID=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --comment "Deploy backend ${DEPLOYMENT_ID}" --parameters '{"commands": ["cat > /tmp/deploy.sh", "chmod +x /tmp/deploy.sh", "/tmp/deploy.sh"], "env": [{"name": "COMMIT_HASH", "value": "'"${CODEBUILD_RESOLVED_SOURCE_VERSION}"'"}]}' --cloud-watch-output-config 'CloudWatchLogGroupName=/backend/deployments,CloudWatchOutputEnabled=true' --query "Command.CommandId" --output text)
         echo "Deployment command ID: $DEPLOY_COMMAND_ID"
-
-      - echo "Waiting for deployment to complete..."
       - |
+        echo "Waiting for deployment to complete..."
         for i in {1..30}; do
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$DEPLOY_COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --query "Status" \
-            --output text 2>/dev/null || echo "Pending")
-          
+          STATUS=$(aws ssm get-command-invocation --command-id "$DEPLOY_COMMAND_ID" --instance-id "$INSTANCE_ID" --query "Status" --output text 2>/dev/null || echo "Pending")
           case $STATUS in
             "Success")
               echo "✅ Deployment successful!"
-              # Get output
-              aws ssm get-command-invocation \
-                --command-id "$DEPLOY_COMMAND_ID" \
-                --instance-id "$INSTANCE_ID" \
-                --query "StandardOutputContent" \
-                --output text
+              aws ssm get-command-invocation --command-id "$DEPLOY_COMMAND_ID" --instance-id "$INSTANCE_ID" --query "StandardOutputContent" --output text
               break
               ;;
             "Failed"|"Cancelled"|"TimedOut")
               echo "❌ Deployment failed with status: $STATUS"
-              # Get error details
-              aws ssm get-command-invocation \
-                --command-id "$DEPLOY_COMMAND_ID" \
-                --instance-id "$INSTANCE_ID" \
-                --query "StandardErrorContent" \
-                --output text
+              aws ssm get-command-invocation --command-id "$DEPLOY_COMMAND_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text
               exit 1
               ;;
             *)
@@ -186,111 +107,44 @@ phases:
               sleep 10
               ;;
           esac
-          
           if [ $i -eq 30 ]; then
             echo "⏰ Deployment timeout"
             exit 1
           fi
         done
-
-      - echo "=== STEP 3: Creating AMI ==="
       - |
-        AMI_ID=$(aws ec2 create-image \
-          --instance-id "$INSTANCE_ID" \
-          --name "$AMI_NAME" \
-          --description "Backend deployment ${DEPLOYMENT_ID}, Commit: ${CODEBUILD_RESOLVED_SOURCE_VERSION}" \
-          --no-reboot \
-          --tag-specifications "
-            ResourceType=image,
-            Tags=[
-              {Key=Name,Value=${AMI_NAME}},
-              {Key=Environment,Value=${ENVIRONMENT}},
-              {Key=DeploymentID,Value=${DEPLOYMENT_ID}},
-              {Key=Commit,Value=${CODEBUILD_RESOLVED_SOURCE_VERSION}}
-            ]" \
-          --query "ImageId" \
-          --output text)
-        
+        echo "=== STEP 3: Creating AMI ==="
+        AMI_TAGS='ResourceType=image,Tags=[{Key=Name,Value='"${AMI_NAME}"'},{Key=Environment,Value='"${ENVIRONMENT}"'},{Key=DeploymentID,Value='"${DEPLOYMENT_ID}"'},{Key=Commit,Value='"${CODEBUILD_RESOLVED_SOURCE_VERSION}"'}]'
+        AMI_ID=$(aws ec2 create-image --instance-id "$INSTANCE_ID" --name "$AMI_NAME" --description "Backend deployment ${DEPLOYMENT_ID}, Commit: ${CODEBUILD_RESOLVED_SOURCE_VERSION}" --no-reboot --tag-specifications "$AMI_TAGS" --query "ImageId" --output text)
         echo "AMI creation started: $AMI_ID"
         echo $AMI_ID > ami_id.txt
-
-      - echo "Waiting for AMI to be available..."
       - |
-        aws ec2 wait image-available \
-          --image-ids "$AMI_ID" \
-          --filters "Name=state,Values=available" \
-          --region "$(echo $AWS_DEFAULT_REGION)"
-        
+        echo "Waiting for AMI to be available..."
+        aws ec2 wait image-available --image-ids "$AMI_ID" --filters "Name=state,Values=available" --region "$(echo $AWS_DEFAULT_REGION)"
         echo "✅ AMI is ready: $AMI_ID"
 
   post_build:
     commands:
       - echo "=== STEP 4: Updating infrastructure ==="
       - AMI_ID=$(cat ami_id.txt)
-      
-      # Create new Launch Template version
       - |
         echo "Creating new Launch Template version..."
-        LT_VERSION=$(aws ec2 create-launch-template-version \
-          --launch-template-name "$LAUNCH_TEMPLATE" \
-          --source-version '$Latest' \
-          --launch-template-data "{
-            \"ImageId\":\"$AMI_ID\",
-            \"InstanceType\":\"t3.micro\",
-            \"TagSpecifications\": [{
-              \"ResourceType\":\"instance\",
-              \"Tags\":[{
-                \"Key\":\"DeploymentID\",
-                \"Value\":\"${DEPLOYMENT_ID}\"
-              }]
-            }]
-          }" \
-          --query "LaunchTemplateVersion.VersionNumber" \
-          --output text)
-        
+        LT_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data '{"ImageId":"'"$AMI_ID"'","InstanceType":"t3.micro","TagSpecifications": [{"ResourceType":"instance","Tags":[{"Key":"DeploymentID","Value":"'"${DEPLOYMENT_ID}"'"}]}]}' --query "LaunchTemplateVersion.VersionNumber" --output text)
         echo "Launch Template version $LT_VERSION created"
         echo $LT_VERSION > lt_version.txt
-
-      # Update ASG to use new version
       - |
         echo "Updating Auto Scaling Group..."
-        aws autoscaling update-auto-scaling-group \
-          --auto-scaling-group-name "$ASG_NAME" \
-          --launch-template "LaunchTemplateName=$LAUNCH_TEMPLATE,Version=$LT_VERSION" \
-          --desired-capacity $(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --query "AutoScalingGroups[0].DesiredCapacity" \
-            --output text)
-
-      # Start instance refresh
+        CURRENT_CAPACITY=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" --query "AutoScalingGroups[0].DesiredCapacity" --output text)
+        aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG_NAME" --launch-template "LaunchTemplateName=$LAUNCH_TEMPLATE,Version=$LT_VERSION" --desired-capacity $CURRENT_CAPACITY
       - |
         echo "Starting instance refresh..."
-        REFRESH_ID=$(aws autoscaling start-instance-refresh \
-          --auto-scaling-group-name "$ASG_NAME" \
-          --strategy Rolling \
-          --preferences '{
-            "MinHealthyPercentage": 90,
-            "InstanceWarmup": 300,
-            "SkipMatching": true,
-            "ScaleInProtectedInstances": "Ignore",
-            "StandbyInstances": "Ignore"
-          }' \
-          --query "InstanceRefreshId" \
-          --output text)
-        
+        REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --strategy Rolling --preferences '{"MinHealthyPercentage": 90, "InstanceWarmup": 300, "SkipMatching": true, "ScaleInProtectedInstances": "Ignore", "StandbyInstances": "Ignore"}' --query "InstanceRefreshId" --output text)
         echo "Instance Refresh ID: $REFRESH_ID"
         echo $REFRESH_ID > refresh_id.txt
-
-      # Wait for refresh to complete (optional)
       - |
         echo "Waiting for instance refresh to complete..."
         for i in {1..60}; do
-          STATUS=$(aws autoscaling describe-instance-refreshes \
-            --auto-scaling-group-name "$ASG_NAME" \
-            --instance-refresh-ids "$REFRESH_ID" \
-            --query "InstanceRefreshes[0].Status" \
-            --output text)
-          
+          STATUS=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name "$ASG_NAME" --instance-refresh-ids "$REFRESH_ID" --query "InstanceRefreshes[0].Status" --output text)
           case $STATUS in
             "Successful")
               echo "✅ Instance refresh completed successfully"
@@ -298,7 +152,6 @@ phases:
               ;;
             "Failed"|"Cancelled")
               echo "❌ Instance refresh failed: $STATUS"
-              # Don't exit - let deployment continue
               break
               ;;
             *)
@@ -307,27 +160,15 @@ phases:
               ;;
           esac
         done
-
-      # Cleanup old AMIs (keep last 5)
       - |
         echo "Cleaning up old AMIs..."
-        aws ec2 describe-images \
-          --owners self \
-          --filters "Name=tag:Environment,Values=${ENVIRONMENT}" \
-          --query "Images[?Tags[?Key=='Name' && starts_with(Value, 'backend-${ENVIRONMENT}-')]].ImageId" \
-          --output text | tr '\t' '\n' | sort -r | tail -n +6 | while read OLD_AMI; do
+        aws ec2 describe-images --owners self --filters "Name=tag:Environment,Values=${ENVIRONMENT}" --query "Images[?Tags[?Key=='Name' && starts_with(Value, 'backend-${ENVIRONMENT}-')]].ImageId" --output text | tr '\t' '\n' | sort -r | tail -n +6 | while read OLD_AMI; do
           echo "Deregistering old AMI: $OLD_AMI"
           aws ec2 deregister-image --image-id "$OLD_AMI" || true
         done
-
-      # Terminate build instance
       - |
         echo "Terminating build instance..."
-        aws ec2 terminate-instances \
-          --instance-ids "$INSTANCE_ID" \
-          --query "TerminatingInstances[0].CurrentState.Name" \
-          --output text
-
+        aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --query "TerminatingInstances[0].CurrentState.Name" --output text
         echo "=== DEPLOYMENT COMPLETE ==="
         echo "AMI: $AMI_ID"
         echo "Launch Template Version: $LT_VERSION"
