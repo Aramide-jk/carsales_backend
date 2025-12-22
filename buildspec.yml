@@ -24,13 +24,14 @@ phases:
 
   pre_build:
     commands:
-      - echo "=== DEPLOYMENT STARTED ==="
-      - echo "Environment: ${ENVIRONMENT}"
-      - echo "Git Commit: ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-      - BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
-      - AMI_NAME="backend-${ENVIRONMENT}-${BUILD_TIMESTAMP}"
-      - INSTANCE_TYPE="t3.micro"
-      - export DEPLOYMENT_ID="deploy-${BUILD_TIMESTAMP}"
+      - |
+        echo "=== DEPLOYMENT STARTED ==="
+        echo "Environment: ${ENVIRONMENT}"
+        echo "Git Commit: ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+        BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        AMI_NAME="backend-${ENVIRONMENT}-${BUILD_TIMESTAMP}"
+        INSTANCE_TYPE="t3.micro"
+        export DEPLOYMENT_ID="deploy-${BUILD_TIMESTAMP}"
       - |
         for param in BASE_AMI SUBNET_ID SG_ID IAM_PROFILE LAUNCH_TEMPLATE ASG_NAME; do
           if [ -z "${!param}" ]; then
@@ -125,8 +126,9 @@ phases:
 
   post_build:
     commands:
-      - echo "=== STEP 4: Updating infrastructure ==="
-      - AMI_ID=$(cat ami_id.txt)
+      - |
+        echo "=== STEP 4: Updating infrastructure ==="
+        AMI_ID=$(cat ami_id.txt)
       - |
         echo "Creating new Launch Template version..."
         LT_VERSION=$(aws ec2 create-launch-template-version --launch-template-name "$LAUNCH_TEMPLATE" --source-version '$Latest' --launch-template-data '{"ImageId":"'"$AMI_ID"'","InstanceType":"t3.micro","TagSpecifications": [{"ResourceType":"instance","Tags":[{"Key":"DeploymentID","Value":"'"${DEPLOYMENT_ID}"'"}]}]}' --query "LaunchTemplateVersion.VersionNumber" --output text)
@@ -176,15 +178,18 @@ phases:
 
   on-failure:
     commands:
-      - echo "=== DEPLOYMENT FAILED ==="
+      - |
+        echo "=== DEPLOYMENT FAILED ==="
       - |
         if [ -f instance_id.txt ]; then
           INSTANCE_ID=$(cat instance_id.txt)
           echo "Terminating failed build instance: $INSTANCE_ID"
           aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" || true
         fi
-      - echo "Check CloudWatch Logs: /backend/deployments"
-      - echo "Check SSM Command History for details"
+      - |
+        echo "Check CloudWatch Logs: /backend/deployments"
+      - |
+        echo "Check SSM Command History for details"
 
 artifacts:
   files:
