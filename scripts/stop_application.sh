@@ -1,22 +1,38 @@
 #!/bin/bash
-set -e
+# This runs BEFORE anything else - clean up completely
 
-echo "Stopping existing backend container..."
+echo "=== ApplicationStop Hook Started ==="
 
-# Stop the container
-docker stop backend 2>/dev/null || true
+# Get all backend containers (running or stopped)
+BACKEND_CONTAINERS=$(docker ps -aq -f name=backend 2>/dev/null)
 
-# Force remove the container
-docker rm -f backend 2>/dev/null || true
-
-# Double-check it's gone
-if docker ps -a | grep -q backend; then
-    echo "WARNING: Container still exists, forcing removal..."
-    CONTAINER_ID=$(docker ps -aq -f name=backend)
-    docker rm -f $CONTAINER_ID 2>/dev/null || true
+if [ -n "$BACKEND_CONTAINERS" ]; then
+    echo "Found existing backend container(s), removing..."
+    
+    # Stop all backend containers
+    docker stop backend 2>/dev/null || true
+    
+    # Force remove all backend containers
+    for container_id in $BACKEND_CONTAINERS; do
+        echo "Removing container: $container_id"
+        docker rm -f $container_id 2>/dev/null || true
+    done
+else
+    echo "No existing backend containers found"
 fi
 
-# Clean up any dangling containers
-docker container prune -f || true
+# Kill any process on port 8000
+if sudo lsof -ti:8000 >/dev/null 2>&1; then
+    echo "Killing process on port 8000..."
+    sudo kill -9 $(sudo lsof -ti:8000) 2>/dev/null || true
+fi
 
-echo "Application stopped successfully"
+# Final verification
+if docker ps -a | grep -q backend; then
+    echo "WARNING: Backend container still exists after cleanup"
+    docker ps -a | grep backend
+    exit 1
+fi
+
+echo "✓ Application stopped and cleaned up successfully"
+exit 0
