@@ -1,10 +1,23 @@
 #!/bin/bash
 set -e
 
+echo "=== ApplicationStart Hook Started ==="
+
 REGION="us-east-1"
 ACCOUNT_ID="734649603753"
 REPO="backend"
 ENV_FILE="/etc/backend.env"
+
+# CRITICAL: One last check before starting
+if docker ps -a | grep -q backend; then
+    echo "ERROR: Backend container still exists! This should not happen."
+    echo "Current containers:"
+    docker ps -a
+    echo "Attempting emergency cleanup..."
+    docker stop backend 2>/dev/null || true
+    docker rm -f backend 2>/dev/null || true
+    sleep 2
+fi
 
 echo "Fetching configuration from SSM..."
 rm -f ${ENV_FILE}
@@ -35,4 +48,16 @@ docker run -d \
   --restart always \
   ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}:latest
 
-echo "Application started successfully"
+# Verify container started
+sleep 5
+if docker ps | grep -q backend; then
+    echo "✓ Backend container started successfully"
+    docker ps | grep backend
+else
+    echo "✗ ERROR: Backend container failed to start"
+    docker logs backend 2>/dev/null || true
+    exit 1
+fi
+
+echo "✓ Application started successfully"
+exit 0
