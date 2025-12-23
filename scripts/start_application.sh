@@ -27,6 +27,11 @@ aws ssm get-parameters \
     echo "$(basename "$name")=$value" >> ${ENV_FILE}
   done
 
+echo "Cleaning up any existing backend containers..."
+# Safety check: remove any existing backend container
+docker stop backend 2>/dev/null || true
+docker rm -f backend 2>/dev/null || true
+
 echo "Starting backend container..."
 docker run -d \
   --name backend \
@@ -34,5 +39,15 @@ docker run -d \
   -p 8000:8000 \
   --restart always \
   ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}:latest
+
+# Verify container started
+sleep 5
+if docker ps | grep -q backend; then
+    echo "✓ Backend container started successfully"
+else
+    echo "✗ ERROR: Backend container failed to start"
+    docker logs backend 2>/dev/null || true
+    exit 1
+fi
 
 echo "Application started successfully"
