@@ -62,15 +62,14 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const isValid = await bcrypt.compare(password, user.password);
 
+  console.log("Login attempt:", email, isValid);
+
   if (!isValid) {
     res.status(401);
     throw new Error("Invalid credentials try again!");
   }
 
   const token = generateToken(user.id, user.role);
-
-  // IMPORTANT: Do not send the whole user object, it contains the password hash.
-  // Send a curated object instead, similar to the registerUser response.
   res.status(200).json({
     _id: user.id,
     name: user.name,
@@ -82,8 +81,6 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
-  // The `req.user` property is typically added by an authentication middleware
-  // after verifying the JWT token.
   const user = await User.findById((req as any).user.id).select("-password");
   if (!user) {
     res.status(404);
