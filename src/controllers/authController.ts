@@ -41,7 +41,6 @@ export const registerUser = asyncHandler(
       role: user.role,
       token: generateToken(user.id, user.role),
     });
-    console.log("User registered:", email);
   }
 );
 
