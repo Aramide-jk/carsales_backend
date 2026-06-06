@@ -37,6 +37,8 @@ const allowedOrigins = (
     ? [
         process.env.FRONTEND_URL,
         process.env.FRONTEND_URL2,
+        "https://www.jkautos.com.ng",
+        "https://jkautos.com.ng",
         process.env.FRONTEND_URL_PRO,
       ]
     : [process.env.FRONTEND_URL_LOCAL, process.env.FRONTEND_URL_VITE]
