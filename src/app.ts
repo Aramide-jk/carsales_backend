@@ -25,7 +25,8 @@ app.use(
     origin: [
       "http://localhost:3000", // React local dev
       "http://localhost:5174", // Vite local dev
-      "https://jkautoss.netlify.app" // production frontend
+      "https://jkautoss.netlify.app" ,// production frontend
+      "https://carsales-frontend.vercel.app",// production frontend
     ],
     credentials: true,
   })
