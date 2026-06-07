@@ -94,13 +94,23 @@ export const createRequest = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getRequests = async (req: Request, res: Response) => {
+export const getRequests = async (req: AuthRequest, res: Response) => {
   try {
-    const requests = await SellCar.find()
-      .populate("user", "name email")
-      .sort({ createdAt: -1 });
+    let requests;
 
-    res.status(200).json(requests);
+    if (req.user?.role === "admin") {
+      requests = await SellCar.find()
+        .populate("user", "name email")
+        .sort({ createdAt: -1 });
+    } else if (req.user) {
+      requests = await SellCar.find({ user: req.user._id })
+        .populate("user", "name email")
+        .sort({ createdAt: -1 });
+    } else {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    res.status(200).json({ success: true, data: requests });
   } catch (error) {
     console.error("Error fetching sell car requests:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -180,7 +190,7 @@ export const updateSellCarStatus = async (req: Request, res: Response) => {
     // ✅ Find the sell request and populate the user
     const request = await SellCar.findById(id).populate<{ user: IUser }>(
       "user",
-      "name email"
+      "name email",
     );
 
     if (!request) {
@@ -208,8 +218,8 @@ export const updateSellCarStatus = async (req: Request, res: Response) => {
             status === "approved"
               ? `<p>🎉 Congratulations! Your request was approved. Our team will contact you soon for the next steps.</p>`
               : status === "rejected"
-              ? `<p>Unfortunately, your request was rejected. You may contact support for more details.</p>`
-              : `<p>Your request is currently pending. We’ll update you once it’s reviewed.</p>`
+                ? `<p>Unfortunately, your request was rejected. You may contact support for more details.</p>`
+                : `<p>Your request is currently pending. We’ll update you once it’s reviewed.</p>`
           }
           <br />
           <p>Thank you for choosing <b>JK Autos</b>.</p>

@@ -19,6 +19,6 @@ const uploadFields = upload.fields([
 ]);
 
 router.post("/", protect, uploadFields, createRequest);
-router.get("/", protect, admin, getRequests);
+router.get("/", protect, getRequests);
 
 export default router;

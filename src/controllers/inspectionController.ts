@@ -1,7 +1,35 @@
 import { Request, Response } from "express";
 import Inspection from "../models/InspectionModel";
+import Car from "../models/CarModel";
 import { IUser } from "../models/UserModel";
-import { sendEmail } from "../utils/sendEmail";
+
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "service_si0kadn";
+const EMAILJS_TEMPLATE_ID =
+  process.env.EMAILJS_TEMPLATE_ID || "template_f9js2nj";
+const EMAILJS_PUBLIC_KEY =
+  process.env.EMAILJS_PUBLIC_KEY || "A7dc_YVPNK6uLO4tz";
+const ADMIN_NOTIFICATION_EMAIL =
+  process.env.ADMIN_NOTIFICATION_EMAIL || "aramidejkolawole@gmail.com";
+
+const sendEmailJS = async (templateParams: Record<string, string>) => {
+  const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      service_id: EMAILJS_SERVICE_ID,
+      template_id: EMAILJS_TEMPLATE_ID,
+      user_id: EMAILJS_PUBLIC_KEY,
+      template_params: templateParams,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`EmailJS error: ${response.status} ${errorText}`);
+  }
+};
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -20,7 +48,7 @@ export const bookInspection = async (req: AuthRequest, res: Response) => {
     }
 
     const newInspection = new Inspection({
-      user: userId, // keep reference to user
+      user: userId,
       car,
       date,
       time,
@@ -31,6 +59,61 @@ export const bookInspection = async (req: AuthRequest, res: Response) => {
     });
 
     const savedInspection = await newInspection.save();
+
+    const carDetails = await Car.findById(car).lean();
+    const carTitle = carDetails
+      ? `${carDetails.brand} ${carDetails.model} ${carDetails.year}`
+      : `Car ID: ${car}`;
+    const userName = req.user?.name || "Customer";
+
+    const emailSubject = "Inspection Booked Successfully";
+    const emailMessage = `Hello ${userName},\n
+Thank you for booking a vehicle inspection with JK Autos. Your inspection request has been received successfully and is currently pending confirmation.\n
+Vehicle: ${carTitle}\nDate: ${new Date(date).toDateString()}\nTime: ${time}\nLocation: ${location}\nPhone: ${phone}${note ? `\nNote: ${note}` : ""}\n
+We will contact you shortly to confirm your inspection details. If you need to make any changes, please reply to this email.\n\nBest regards,\nJK Autos Team`;
+
+    try {
+      await sendEmailJS({
+        from_name: "JK_Autos",
+        from_email: "no-reply@jkautos.com",
+        to_email: email,
+        subject: emailSubject,
+        message: emailMessage,
+        vehicle: carTitle,
+        date: new Date(date).toDateString(),
+        time,
+        location,
+        phone,
+        note: note || "None",
+      });
+      console.log(`Inspection confirmation email sent to ${email}`);
+    } catch (sendError) {
+      console.error("Failed to send inspection confirmation email:", sendError);
+    }
+
+    try {
+      await sendEmailJS({
+        from_name: userName,
+        from_email: email,
+        to_email: ADMIN_NOTIFICATION_EMAIL,
+        subject: `New Inspection Booking from ${userName}`,
+        message: `New inspection booking received from ${userName}.\n\nVehicle: ${carTitle}\nDate: ${new Date(date).toDateString()}\nTime: ${time}\nLocation: ${location}\nPhone: ${phone}${note ? `\nNote: ${note}` : ""}\n\nCustomer email: ${email}`,
+        vehicle: carTitle,
+        date: new Date(date).toDateString(),
+        time,
+        location,
+        phone,
+        note: note || "None",
+      });
+      console.log(
+        `Admin notification email sent to ${ADMIN_NOTIFICATION_EMAIL}`,
+      );
+    } catch (adminSendError) {
+      console.error(
+        "Failed to send admin inspection notification email:",
+        adminSendError,
+      );
+    }
 
     res.status(201).json({
       success: true,
@@ -158,10 +241,9 @@ export const updateInspection = async (req: Request, res: Response) => {
 
     // ✅ Find and populate necessary fields
     const inspection = await Inspection.findById(id)
-      .populate<{ user: { name: string; email: string; phone?: string } }>(
-        "user",
-        "name email phone"
-      )
+      .populate<{
+        user: { name: string; email: string; phone?: string };
+      }>("user", "name email phone")
       .populate<{
         car: { brand: string; model: string; year: string; location?: string };
       }>("car");
@@ -242,10 +324,13 @@ export const updateInspection = async (req: Request, res: Response) => {
     // ✅ Send email (only if there's a valid recipient)
     if (userEmail && subject && html) {
       try {
-        await sendEmail({
-          to: userEmail,
+        await sendEmailJS({
+          from_name: userName,
+          from_email: "no-reply@jkautos.com",
+          to_email: userEmail,
           subject,
-          html,
+          message: html,
+          phone: userPhone,
         });
         console.log(`✅ Email sent to ${userEmail} (status: ${status})`);
       } catch (err) {
